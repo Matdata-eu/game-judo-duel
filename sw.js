@@ -1,5 +1,5 @@
 // Tatami Duel service worker: app shell cache-first, Google Fonts stale-while-revalidate.
-const VERSION = "tatamiduel-v2";
+const VERSION = "tatamiduel-v3";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

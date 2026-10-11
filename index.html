@@ -363,8 +363,63 @@ const sfx = {
   power: () => { tone(520, .12, "triangle", .08, 400); tone(780, .2, "triangle", .06, 500, .08); },
   gong: () => { tone(196, 1.6, "sine", .16); tone(392, 1.2, "sine", .06); tone(588, .9, "sine", .03); },
   bell: () => { tone(880, .5, "sine", .08); tone(1320, .4, "sine", .04); },
-  crowd: big => noise(big ? 1.6 : .9, big ? .14 : .07, 700, .4),
 };
+// Crowd reactions, synthesized: a few dozen voices sung through vowel formants
+// ("yeah" for a cheer, "ooo" for a boo), a breathy noise bed, and for cheers some claps and whistles.
+function crowd(kind, big) {
+  if (!AC || muted || G.demo) return;
+  if (!noiseBuf) { noiseBuf = AC.createBuffer(1, AC.sampleRate * 1.5, AC.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const cheer = kind === "cheer", t0 = AC.currentTime, dur = big ? 2.6 : 1.9, R = Math.random;
+  const end = t0 + dur, peak = (cheer ? .7 : .85) * (big ? 1.25 : 1);
+  const out = AC.createGain();
+  out.gain.setValueAtTime(.0001, t0);
+  out.gain.exponentialRampToValueAtTime(peak, t0 + (cheer ? .15 : .4));
+  out.gain.setValueAtTime(peak, t0 + dur * .45);
+  out.gain.exponentialRampToValueAtTime(.0001, end);
+  out.connect(AC.destination);
+  const bus = AC.createGain();
+  const formants = cheer ? [[800, 5, 1], [1300, 7, .7], [2700, 9, .3]] : [[320, 4, 1], [780, 6, .4], [2400, 9, .08]];
+  for (const [fq, q, g] of formants) {
+    const bp = AC.createBiquadFilter(), gg = AC.createGain();
+    bp.type = "bandpass"; bp.frequency.value = fq; bp.Q.value = q; gg.gain.value = g * 2.2;
+    bus.connect(bp).connect(gg).connect(out);
+  }
+  const voices = big ? 22 : 16;
+  for (let i = 0; i < voices; i++) {
+    const o = AC.createOscillator(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();
+    const st = t0 + R() * (cheer ? .12 : .35), f0 = cheer ? 170 + R() * 280 : 90 + R() * 120;
+    o.type = "sawtooth";
+    // cheers rise, boos sag
+    o.frequency.setValueAtTime(f0 * (cheer ? .8 : 1.06), st);
+    o.frequency.linearRampToValueAtTime(f0, st + .3);
+    o.frequency.linearRampToValueAtTime(f0 * (cheer ? 1.15 : .8), end);
+    lfo.frequency.value = 4 + R() * 3; lg.gain.value = f0 * .025;
+    g.gain.setValueAtTime(.0001, st); g.gain.exponentialRampToValueAtTime(1.6 / voices, st + .12);
+    lfo.connect(lg).connect(o.frequency); o.connect(g).connect(bus);
+    o.start(st); lfo.start(st); o.stop(end + .05); lfo.stop(end + .05);
+  }
+  const s = AC.createBufferSource(), f = AC.createBiquadFilter(), ng = AC.createGain();
+  s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = cheer ? 1400 : 450; f.Q.value = .6; ng.gain.value = cheer ? .45 : .35;
+  s.connect(f).connect(ng).connect(out); s.start(t0, R()); s.stop(end);
+  if (!cheer) return;
+  const claps = big ? 34 : 22;
+  for (let i = 0; i < claps; i++) {
+    const c = AC.createBufferSource(), cf = AC.createBiquadFilter(), cg = AC.createGain(), ct = t0 + .1 + R() * (dur - .5);
+    c.buffer = noiseBuf; cf.type = "bandpass"; cf.frequency.value = 1100 + R() * 1400; cf.Q.value = 1.4;
+    cg.gain.setValueAtTime(.12 + R() * .1, ct); cg.gain.exponentialRampToValueAtTime(.0001, ct + .05);
+    c.connect(cf).connect(cg).connect(AC.destination); c.start(ct, R()); c.stop(ct + .06);
+  }
+  for (let i = 0, n = big ? 2 : 1; i < n; i++) {
+    const w = AC.createOscillator(), wg = AC.createGain(), wt = t0 + .2 + R() * .6, wf = 2100 + R() * 700;
+    w.type = "sine"; w.frequency.setValueAtTime(wf * .8, wt); w.frequency.exponentialRampToValueAtTime(wf * 1.15, wt + .25);
+    w.frequency.setValueAtTime(wf * .9, wt + .45); w.frequency.exponentialRampToValueAtTime(wf * 1.2, wt + .75);
+    wg.gain.setValueAtTime(.0001, wt); wg.gain.exponentialRampToValueAtTime(.035, wt + .05);
+    wg.gain.setValueAtTime(.035, wt + .3); wg.gain.exponentialRampToValueAtTime(.0001, wt + .8);
+    w.connect(wg).connect(AC.destination); w.start(wt); w.stop(wt + .85);
+  }
+}
+// Cheer when a human scores, boo when the bot does.
+const crowdFor = (human, big) => crowd(human ? "cheer" : "boo", big);
 let jaVoice = null;
 function pickVoice() { try { const v = speechSynthesis.getVoices(); jaVoice = v.find(x => /^ja(-|_)JP/i.test(x.lang)) || v.find(x => /^ja/i.test(x.lang)) || null; } catch (e) {} }
 try { pickVoice(); speechSynthesis.addEventListener("voiceschanged", pickVoice); } catch (e) {}
@@ -551,7 +606,7 @@ function award(s, kind, T, why) {
     caption(awasete ? "Waza-ari awasete ippon!" : "Ippon!", (name ? name + " · " : "") + SIDE[s].name + " wins", 3);
     if (T) say(T.kana + "、" + (awasete ? "わざあり、あわせていっぽん" : "いっぽん"), T.name + "! " + (awasete ? "Waza-ari awasete ippon!" : "Ippon!"));
     else say(awasete ? "わざあり、あわせていっぽん" : "いっぽん", awasete ? "Waza-ari awasete ippon!" : "Ippon!");
-    sfx.crowd(true); sfx.gong();
+    crowdFor(f.human, true); sfx.gong();
     G.pending = { against: o.side, kind: awasete ? "awasete" : "ippon", until: G.t + 2.4, s };
     endContest(s, awasete ? "Waza-ari awasete ippon" : "Ippon" + (name ? " · " + name : ""));
     return true;
@@ -559,7 +614,7 @@ function award(s, kind, T, why) {
   signal("waza", s, 1.8);
   caption("Waza-ari!", (name ? name + " · " : "") + SIDE[s].name, 2.2);
   if (T) techCall(T, "waza"); else say("わざあり", "Waza-ari!");
-  sfx.crowd(false);
+  crowdFor(f.human, false);
   G.pending = { against: o.side, kind: "waza", until: G.t + 2.4, s };
   if (G.gs) { endContest(s, "Golden score · waza-ari"); return true; }
   return false;
@@ -737,7 +792,7 @@ function updGround(dt) {
   if (g.hold >= 10 && !g.waza10) {
     g.waza10 = true;
     if (T.waza >= 1) { G.sig = null; award(T.side, "waza", null, "pin"); return; }
-    T.waza++; caption("Waza-ari!", "Osaekomi · 10 seconds", 1.8); say("わざあり", "Waza-ari!"); sfx.crowd(false);
+    T.waza++; caption("Waza-ari!", "Osaekomi · 10 seconds", 1.8); say("わざあり", "Waza-ari!"); crowdFor(T.human, false);
     G.pending = { against: U.side, kind: "waza", until: G.t + 2.4, s: T.side };
     if (G.gs) { G.sig = null; signal("waza", T.side, 1.8); endContest(T.side, "Golden score · osaekomi"); return; }
   }
