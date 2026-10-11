@@ -1,0 +1,1456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Tatami Duel</title>
+<meta name="theme-color" content="#10141c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tatami Duel">
+<meta name="description" content="Tatami Duel: a judo game. Grip, break balance, throw and pin, for two players or you against a bot.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: one full-bleed arena canvas, camera on the tatami; menus float over a live bot-vs-bot contest like the scoreboard panel */
+:root{
+  --hall:#10141c;
+  --panel:rgba(14,18,27,.92);
+  --line:rgba(236,240,244,.16);
+  --chalk:#eef1f4;
+  --muted:#a3adb9;
+  --white:#f4f2ec;
+  --blue:#3b7bff;
+  --mat:#e9c44a;
+  --led:#ffd257;
+  --display:"Bungee","Impact","Arial Black",sans-serif;
+  --body:"Barlow Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html{height:100%;box-sizing:border-box}
+body{height:100%;background:var(--hall);color:var(--chalk);font-family:var(--body);font-size:17px;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+*,*::before,*::after{box-sizing:border-box}
+#stage{position:relative;width:100%;height:100%;overflow:hidden;touch-action:none}
+#cv{display:block;width:100%;height:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--led);outline-offset:2px}
+
+.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:16px;overflow:auto;background:radial-gradient(ellipse at center,rgba(16,20,28,.35),rgba(16,20,28,.78))}
+.panel{width:min(540px,100%);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;display:grid;gap:16px;box-shadow:0 24px 70px rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.eyebrow{font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--led);font-weight:700}
+h1,h2{font-family:var(--display);font-weight:400;margin:0;line-height:.95;text-wrap:balance}
+h1{font-size:clamp(40px,8vw,60px)}
+h1 .w{color:var(--white)} h1 .b{color:var(--blue)}
+h2{font-size:clamp(28px,6vw,40px)}
+.sub{margin:6px 0 0;color:var(--muted);line-height:1.35;max-width:48ch}
+.field{display:grid;gap:8px}
+.label{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1 1 0;min-width:84px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:rgba(236,240,244,.06);font-weight:600;font-size:18px;letter-spacing:.02em}
+.seg button:hover{background:rgba(236,240,244,.12)}
+.seg button[aria-pressed="true"]{background:var(--chalk);color:var(--hall);border-color:var(--chalk)}
+.wdesc{margin:0;font-size:15px;color:var(--muted);line-height:1.35;min-height:2.7em}
+.play{font-family:var(--display);font-size:24px;background:var(--mat);color:#1b1608;border:0;border-radius:10px;padding:14px 18px;box-shadow:0 6px 0 #9a7d1c;transition:transform .08s,box-shadow .08s}
+.play:active{transform:translateY(4px);box-shadow:0 2px 0 #9a7d1c}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-weight:600;font-size:18px}
+.ghost:hover{background:rgba(236,240,244,.08)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 140px}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;font-size:16px;color:var(--muted);line-height:1.5}
+.keys b{color:var(--chalk);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:13px;display:block}
+.keys .t1 b{color:var(--white)} .keys .t2 b{color:var(--blue)}
+kbd{font-family:var(--body);font-weight:700;color:var(--chalk);background:rgba(236,240,244,.1);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;font-size:15px}
+.final{display:flex;align-items:center;justify-content:center;gap:18px;font-family:var(--display);font-size:46px;font-variant-numeric:tabular-nums}
+.final .s1{color:var(--white)} .final .s2{color:var(--blue)} .final .dash{color:var(--muted);font-size:30px}
+.center{text-align:center}
+.credits{margin:0;font-size:14px;color:var(--muted);line-height:1.45;border-top:1px solid var(--line);padding-top:12px}
+.credits a{color:var(--chalk);text-decoration:underline;text-decoration-color:rgba(236,240,244,.35);text-underline-offset:2px}
+.credits a:hover{text-decoration-color:var(--led)}
+.panel.menu .credits{grid-column:1 / -1}
+.opts{display:grid;gap:14px}
+.clubs{display:flex;gap:6px;flex-wrap:wrap}
+.clubs select{flex:1 1 140px;min-width:0;appearance:none;-webkit-appearance:none;padding:10px 34px 10px 12px;border-radius:9px;border:1px solid var(--line);border-left:6px solid var(--white);background:rgba(236,240,244,.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23eef1f4' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center;color:var(--chalk);font:600 18px var(--body);cursor:pointer}
+.clubs select#belt2,.clubs select#nat2{border-left-color:var(--blue)}
+.clubs select option{background:#10141c;color:#eef1f4}
+
+@media (max-height:560px) and (min-width:620px){
+  .panel.menu{width:min(860px,100%);grid-template-columns:1fr 1fr;column-gap:24px;align-items:start}
+  .panel.menu .intro{grid-column:1;grid-row:1 / span 2}
+  .panel.menu .opts{grid-column:2;grid-row:1 / span 3;display:grid;gap:12px}
+  .panel.menu .play{grid-column:1;grid-row:3}
+  .panel.menu .keys{grid-column:1 / span 2}
+  h1{font-size:44px}
+}
+
+#hudBtns{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:12px;display:flex;gap:8px}
+#hudBtns button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(14,18,27,.7);font-weight:700;font-size:16px;display:grid;place-items:center}
+
+#touch{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;padding:0 16px calc(14px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.pad{display:grid;grid-auto-flow:column;gap:10px;pointer-events:auto;align-items:end}
+.pad.quad{grid-template-rows:auto auto;grid-auto-flow:row;grid-template-columns:auto auto auto}
+.pad.quad .tbtn{width:60px;height:60px;font-size:13px}
+.tbtn{width:70px;height:70px;border-radius:50%;background:rgba(236,240,244,.1);border:2px solid rgba(236,240,244,.28);color:var(--chalk);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;touch-action:none;display:grid;place-items:center}
+.tbtn.big{width:84px;height:84px}
+.tbtn.on{background:rgba(236,240,244,.32)}
+.tbtn.atk{background:rgba(233,196,74,.24);border-color:rgba(233,196,74,.85)}
+.tbtn.atk.on{background:rgba(233,196,74,.55)}
+.tbtn.pw{background:rgba(255,210,87,.3);border-color:var(--led);font-size:12px;letter-spacing:.02em}
+.tbtn.pw.off{opacity:.35}
+.pad.p1 .tbtn{border-color:var(--white)}
+.pad.p2 .tbtn{border-color:var(--blue)}
+@media (max-height:420px){.tbtn{width:58px;height:58px;font-size:13px}.tbtn.big{width:72px;height:72px}}
+#rotate{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:600;font-size:15px;white-space:nowrap;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.play{transition:none}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" aria-label="Judo mat"></canvas>
+
+  <div id="hudBtns" hidden>
+    <button id="muteBtn" aria-label="Toggle sound" title="Sound">♪</button>
+    <button id="pauseBtn" aria-label="Pause" title="Pause (P)">II</button>
+  </div>
+
+  <div id="touch" hidden></div>
+  <div id="rotate" hidden>Turn your phone sideways for a wider mat</div>
+
+  <div class="overlay" id="menu">
+    <div class="panel menu">
+      <div class="intro">
+        <div class="eyebrow">Judo · Tachi-waza · Ne-waza</div>
+        <h1>Tatami <span class="w">Du</span><span class="b">el</span></h1>
+        <p class="sub">Take a grip, pull and push to break your opponent's balance, then throw. Pin them on the ground or counter their attack. The referee calls every throw, score and penalty with the real signals.</p>
+      </div>
+      <div class="opts">
+        <div class="field">
+          <div class="label">Opponent</div>
+          <div class="seg" id="modeSeg">
+            <button id="mode-bot" data-mode="bot">Bot</button>
+            <button id="mode-2p" data-mode="2p">2 Players</button>
+          </div>
+        </div>
+        <div class="field" id="levelField">
+          <div class="label">Bot level</div>
+          <div class="seg" id="levelSeg">
+            <button id="lv-easy" data-level="easy">Easy</button>
+            <button id="lv-medium" data-level="medium">Medium</button>
+            <button id="lv-hard" data-level="hard">Hard</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="label">Belts</div>
+          <div class="clubs">
+            <select id="belt1" aria-label="White judoka's belt"></select>
+            <select id="belt2" aria-label="Blue judoka's belt"></select>
+          </div>
+        </div>
+        <div class="field">
+          <div class="label">Superpowers</div>
+          <div class="clubs">
+            <select id="nat1" aria-label="White judoka's superpower"></select>
+            <select id="nat2" aria-label="Blue judoka's superpower"></select>
+          </div>
+          <p class="wdesc" id="natdesc"></p>
+        </div>
+        <div class="field">
+          <div class="label">Contest</div>
+          <div class="seg" id="lenSeg">
+            <button id="len-2" data-mins="2">2 min</button>
+            <button id="len-3" data-mins="3">3 min</button>
+            <button id="len-4" data-mins="4">4 min</button>
+          </div>
+        </div>
+      </div>
+      <button class="play" id="playBtn">Hajime</button>
+      <div class="keys" id="keys"></div>
+      <p class="credits">Made by <a href="https://matdata.eu" target="_blank" rel="noopener">Matdata</a> · MIT licensed · Fonts: Bungee, Barlow Condensed (SIL OFL) · <a href="https://github.com/Matdata-eu/game-judo-duel" target="_blank" rel="noopener">Source</a> · <a href="https://github.com/Matdata-eu/game-judo-duel/issues" target="_blank" rel="noopener">Support &amp; feedback</a></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="pauseOv" hidden>
+    <div class="panel center">
+      <h2>Matte</h2>
+      <div class="row">
+        <button class="play" id="resumeBtn">Resume</button>
+        <button class="ghost" id="quitBtn">Quit to menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overOv" hidden>
+    <div class="panel center">
+      <div class="eyebrow" id="overEyebrow">Sore-made</div>
+      <h2 id="overTitle">White wins</h2>
+      <div class="final"><span class="s1" id="fs1">0</span><span class="dash">–</span><span class="s2" id="fs2">0</span></div>
+      <p class="sub" id="overStats" style="margin:0 auto"></p>
+      <div class="row">
+        <button class="play" id="againBtn">Rematch</button>
+        <button class="ghost" id="menuBtn">Change setup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+
+// ---------- world (meters; x along the mat, y up). Logical screen is VW x 720 ----------
+let VW = 1280;
+const VH = 720, FLOOR = 592, S = 148;
+const END = 4, SAFE = 7, MARK = 1.6;          // contest area is 8 m wide, safety area 3 m each side
+const GRIP_RANGE = 1.15, MIN_GAP = .76, WALK = 1.45;
+const L1 = .47, L2 = .47, A1 = .3, A2 = .29;
+const PASSIVE = 25;                              // seconds without an attack before a shido (shortened from about 45 s)
+
+const MINS = { 2: 120, 3: 180, 4: 240 };
+const LEVELS = {
+  easy:   { name: "Easy",   react: .38, jit: .10, counter: .07, block: .25, brk: .25, sweep: .07, thr: .55, take: .45, err: .08, think: [.30, .60], mash: 3.2, pin: .9 },
+  medium: { name: "Medium", react: .25, jit: .06, counter: .16, block: .45, brk: .45, sweep: .14, thr: .42, take: .70, err: .04, think: [.18, .40], mash: 4.6, pin: .6 },
+  hard:   { name: "Hard",   react: .15, jit: .03, counter: .28, block: .60, brk: .60, sweep: .22, thr: .34, take: .88, err: .015, think: [.10, .24], mash: 6.2, pin: .35 },
+};
+// Techniques. kz: the balance the throw needs from uke (+1 broken forward, -1 broken backward, 0 caught mid-step).
+// fall: "over" uke flies over tori and lands beyond, "back" uke falls backwards, "side" uke is swept down where they stand.
+const TECH = {
+  seoi:    { name: "Seoi-nage", en: "shoulder throw", kana: "せおいなげ", kz: 1, entry: .38, dur: .9, fall: "over", gap: .42, pin: "seoiIn", pout: "seoiOut" },
+  uchi:    { name: "Uchi-mata", en: "inner thigh throw", kana: "うちまた", kz: 1, entry: .32, dur: .85, fall: "over", gap: .48, pin: "uchiIn", pout: "uchiOut" },
+  osoto:   { name: "O-soto-gari", en: "major outer reap", kana: "おおそとがり", kz: -1, entry: .28, dur: .7, fall: "back", gap: .46, pin: "osotoIn", pout: "osotoOut" },
+  deashi:  { name: "De-ashi-barai", en: "advanced foot sweep", kana: "であしばらい", kz: 0, entry: .14, dur: .55, fall: "side", gap: .7, pin: "sweep", pout: "sweep" },
+  uranage: { name: "Ura-nage", en: "rear throw, countering", kana: "うらなげ", kz: 0, entry: 0, dur: .85, fall: "over", gap: .45, pin: "osotoIn", pout: "uraOut", counter: true },
+  gaeshi:  { name: "O-soto-gaeshi", en: "outer reap counter", kana: "おおそとがえし", kz: 0, entry: 0, dur: .7, fall: "back", gap: .46, pin: "osotoIn", pout: "osotoOut", counter: true },
+  tsubame: { name: "Tsubame-gaeshi", en: "swallow counter", kana: "つばめがえし", kz: 0, entry: 0, dur: .55, fall: "side", gap: .7, pin: "sweep", pout: "sweep", counter: true },
+};
+const COUNTER_OF = { seoi: "uranage", uchi: "uranage", osoto: "gaeshi", deashi: "tsubame" };
+const BELTS = {
+  white:  { name: "White belt", c: "#f4f2ec" }, yellow: { name: "Yellow belt", c: "#f3cf2e" }, orange: { name: "Orange belt", c: "#f08a24" },
+  green:  { name: "Green belt", c: "#2e9e4f" }, blue: { name: "Blue belt", c: "#2d63c8" }, brown: { name: "Brown belt", c: "#6b4226" },
+  black:  { name: "Black belt", c: "#16171a" }, redwhite: { name: "Red and white belt (6th–8th dan)", c: "#d42b2b", c2: "#f4f2ec" },
+};
+const BELT_ORDER = ["white", "yellow", "orange", "green", "blue", "brown", "black", "redwhite"];
+// Tongue-in-cheek national superpowers. "call" powers work while a score goes against you; "fight" powers during the contest.
+const NATIONS = {
+  none: { name: "No superpower", power: "", flag: null },
+  bel: { name: "Belgium", power: "Belgian compromise", short: "Deal", when: "call", flag: { v: ["#1a1a1a", "#fdda24", "#ef3340"] },
+         desc: "Belgium: when a score goes against you, negotiate until it is level: one waza-ari each." },
+  ita: { name: "Italy", power: "Protesta!", short: "Protesta", when: "call", flag: { v: ["#009246", "#ffffff", "#ce2b37"] },
+         desc: "Italy: when a score or shido goes against you, protest at length. Half the time the referee cancels it (torikeshi); otherwise you get a shido." },
+  jpn: { name: "Japan", power: "Textbook ippon", short: "Ippon", when: "fight", flag: { jp: true },
+         desc: "Japan: for 8 seconds your throws are textbook. One that scores is ippon, and it can't be countered." },
+  geo: { name: "Georgia", power: "Bear hug", short: "Bear", when: "fight", flag: { geo: true },
+         desc: "Georgia: for 7 seconds you hold a full grip nobody can break, and every pull and push counts double." },
+  bra: { name: "Brazil", power: "Jiu-jitsu", short: "BJJ", when: "fight", flag: { bra: true },
+         desc: "Brazil: the next ground fight is yours. Pin at once and hold for 10 seconds nobody can escape; if you're the one pinned, slip out straight away." },
+  gbr: { name: "Great Britain", power: "Tea time", short: "Tea", when: "fight", flag: { uk: true },
+         desc: "Great Britain: offer a cup of tea. Your opponent is far too polite to refuse, lets go of the grip and stops for a moment." },
+};
+const NATION_ORDER = ["bel", "ita", "jpn", "geo", "bra", "gbr", "none"];
+// The judoka called first wears white and starts on the referee's right (screen left); the other wears blue.
+const SIDE = [
+  { name: "White", ja: "しろ", col: "#f4f2ec", gi: "#f4f2ec", giShade: "#d9d6cd", edge: "#8d8a82", skin: "#e2b48c", hair: "#3a2a1e", glow: "255,255,255" },
+  { name: "Blue", ja: "あお", col: "#3b7bff", gi: "#2559c6", giShade: "#1c469e", edge: "#0f2a63", skin: "#a8724a", hair: "#16110d", glow: "70,130,255" },
+];
+
+// Poses: local meters, x toward the opponent from the judoka's position, y up from the floor. Knees and elbows are solved with IK.
+// look: which way the face points (1 toward the opponent, -1 away, as when turning in for a throw).
+const POSE = {
+  stand:    { hip: [0, .94],   ff: [.24, 0],   bf: [-.26, 0],  sh: [.05, 1.46],  hd: [.08, 1.65], fh: [.42, 1.18], bh: [.3, 1.02], look: 1 },
+  reach:    { hip: [.04, .94], ff: [.3, 0],    bf: [-.24, 0],  sh: [.12, 1.45],  hd: [.15, 1.63], fh: [.7, 1.32],  bh: [.6, 1.1],  look: 1 },
+  seoiIn:   { hip: [.02, .7],  ff: [.2, 0],    bf: [-.2, 0],   sh: [-.26, 1.12], hd: [-.38, 1.2], fh: [-.18, 1.3], bh: [-.3, 1.05], look: -1 },
+  seoiOut:  { hip: [.06, .72], ff: [.26, 0],   bf: [-.18, 0],  sh: [-.36, .98],  hd: [-.5, .95],  fh: [-.6, .8],   bh: [-.5, .72], look: -1 },
+  uchiIn:   { hip: [.02, .9],  ff: [-.05, 0],  bf: [.5, .55],  sh: [-.22, 1.36], hd: [-.32, 1.5], fh: [-.12, 1.25], bh: [-.25, 1.1], look: -1 },
+  uchiOut:  { hip: [.0, .88],  ff: [-.05, 0],  bf: [.62, 1.0], sh: [-.42, 1.15], hd: [-.55, 1.2], fh: [-.6, .95],  bh: [-.5, .85], look: -1 },
+  osotoIn:  { hip: [.1, .92],  ff: [.25, 0],   bf: [.55, .3],  sh: [.24, 1.44],  hd: [.3, 1.62],  fh: [.6, 1.38],  bh: [.5, 1.12], look: 1 },
+  osotoOut: { hip: [.25, .8],  ff: [.4, 0],    bf: [1.0, .75], sh: [.62, 1.12],  hd: [.74, 1.2],  fh: [.92, .9],   bh: [.82, .78], look: 1 },
+  uraOut:   { hip: [.1, .6],   ff: [.3, 0],    bf: [-.2, 0],   sh: [-.25, 1.0],  hd: [-.38, 1.05], fh: [-.4, 1.25], bh: [-.3, 1.3], look: 1 },
+  sweep:    { hip: [.08, .93], ff: [.82, .1],  bf: [-.22, 0],  sh: [.0, 1.45],   hd: [.0, 1.64],  fh: [.38, 1.2],  bh: [.25, 1.05], look: 1 },
+  stunned:  { hip: [.12, .82], ff: [.4, 0],    bf: [-.22, 0],  sh: [.42, 1.28],  hd: [.52, 1.42], fh: [.66, .9],   bh: [.45, .8],  look: 1 },
+  air:      { hip: [0, .94],   ff: [.22, .2],  bf: [-.1, .3],  sh: [0, 1.48],    hd: [.02, 1.66], fh: [.4, 1.35],  bh: [.25, 1.55], look: 1 },
+  flat:     { hip: [0, .94],   ff: [.08, .06], bf: [-.04, .1], sh: [0, 1.46],    hd: [0, 1.66],   fh: [.5, 1.45],  bh: [.45, 1.25], look: 1 },
+  turtle:   { hip: [0, .5],    ff: [-.42, .03], bf: [-.36, .03], sh: [.48, .58], hd: [.66, .52],  fh: [.52, .02],  bh: [.42, .02], look: 1 },
+  kneel:    { hip: [0, .52],   ff: [-.4, .03], bf: [-.34, .03], sh: [.3, .98],   hd: [.38, 1.13], fh: [.62, .62],  bh: [.5, .5],   look: 1 },
+  pin:      { hip: [0, .44],   ff: [-.44, .03], bf: [-.36, .03], sh: [.5, .5],   hd: [.68, .52],  fh: [.78, .16],  bh: [.4, .18],  look: 1 },
+  tea:      { hip: [0, .95],   ff: [.14, 0],   bf: [-.14, 0],  sh: [0, 1.48],    hd: [.01, 1.67], fh: [.2, 1.25],  bh: [.12, 1.12], look: 1 },
+  win:      { hip: [0, .95],   ff: [.18, 0],   bf: [-.18, 0],  sh: [0, 1.48],    hd: [.01, 1.67], fh: [.16, 2.05], bh: [-.12, 1.05], look: 1 },
+};
+const PK = ["hip", "ff", "bf", "sh", "hd", "fh", "bh"];
+function mixPose(a, b, k) {
+  const o = {};
+  for (const n of PK) o[n] = [a[n][0] + (b[n][0] - a[n][0]) * k, a[n][1] + (b[n][1] - a[n][1]) * k];
+  o.look = k < .5 ? a.look : b.look;
+  return o;
+}
+const clonePose = a => mixPose(a, a, 0);
+
+// ---------- settings ----------
+const settings = { mode: "bot", level: "medium", mins: 4, belt1: "black", belt2: "black", nat1: "bel", nat2: "jpn" };
+try { Object.assign(settings, JSON.parse(localStorage.getItem("tatamiduel.settings") || "{}")); } catch (e) {}
+if (!MINS[settings.mins]) settings.mins = 4;
+if (!LEVELS[settings.level]) settings.level = "medium";
+if (!BELTS[settings.belt1]) settings.belt1 = "black";
+if (!BELTS[settings.belt2]) settings.belt2 = "black";
+if (!NATIONS[settings.nat1]) settings.nat1 = "bel";
+if (!NATIONS[settings.nat2]) settings.nat2 = "jpn";
+function saveSettings() { try { localStorage.setItem("tatamiduel.settings", JSON.stringify(settings)); } catch (e) {} }
+
+// ---------- helpers ----------
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease = k => k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k);
+function randn() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const fmtClock = s => { s = Math.max(0, s); const m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ":" + String(r).padStart(2, "0"); };
+function ik(a, b, l1, l2, bend) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const d = clamp(Math.hypot(dx, dy), .01, l1 + l2 - 1e-4);
+  const base = Math.atan2(dy, dx);
+  const al = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
+  return [a[0] + l1 * Math.cos(base + bend * al), a[1] + l1 * Math.sin(base + bend * al)];
+}
+const rotAbout = (p, c, a) => { const s = Math.sin(a), co = Math.cos(a), x = p[0] - c[0], y = p[1] - c[1]; return [c[0] + co * x - s * y, c[1] + s * x + co * y]; };
+
+// ---------- audio ----------
+let AC = null, muted = false;
+try { muted = localStorage.getItem("tatamiduel.muted") === "1"; } catch (e) {}
+function initAudio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === "suspended") AC.resume().catch(() => {});
+}
+function tone(freq, dur, type, vol, slide, delay) {
+  if (!AC || muted || G.demo) return;
+  const t = AC.currentTime + (delay || 0), o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + .02);
+}
+let noiseBuf = null;
+function noise(dur, vol, freq, q, delay) {
+  if (!AC || muted || G.demo) return;
+  if (!noiseBuf) { noiseBuf = AC.createBuffer(1, AC.sampleRate * 1.5, AC.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const t = AC.currentTime + (delay || 0), s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q || 1;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(AC.destination); s.start(t); s.stop(t + dur);
+}
+const sfx = {
+  step: () => noise(.05, .04, 500, 1.2),
+  grip: () => noise(.09, .1, 1800, 2.2),
+  rip: () => { noise(.12, .12, 2400, 1.4); noise(.08, .08, 900, 1, .05); },
+  kiai: () => { tone(260, .16, "sawtooth", .05, 120); noise(.12, .05, 1200, 1); },
+  whoosh: () => noise(.3, .08, 900, .7),
+  slam: big => { tone(70, big ? .45 : .3, "sine", big ? .5 : .32, -35); noise(big ? .32 : .2, big ? .32 : .2, 260, .8); },
+  slap: () => noise(.07, .16, 2600, 1.6),
+  call: () => tone(660, .08, "sine", .04),
+  power: () => { tone(520, .12, "triangle", .08, 400); tone(780, .2, "triangle", .06, 500, .08); },
+  gong: () => { tone(196, 1.6, "sine", .16); tone(392, 1.2, "sine", .06); tone(588, .9, "sine", .03); },
+  bell: () => { tone(880, .5, "sine", .08); tone(1320, .4, "sine", .04); },
+  crowd: big => noise(big ? 1.6 : .9, big ? .14 : .07, 700, .4),
+};
+let jaVoice = null;
+function pickVoice() { try { const v = speechSynthesis.getVoices(); jaVoice = v.find(x => /^ja(-|_)JP/i.test(x.lang)) || v.find(x => /^ja/i.test(x.lang)) || null; } catch (e) {} }
+try { pickVoice(); speechSynthesis.addEventListener("voiceschanged", pickVoice); } catch (e) {}
+// The referee speaks Japanese: kana for a Japanese voice, romaji otherwise.
+function say(kana, romaji) {
+  if (muted || G.demo || !("speechSynthesis" in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(jaVoice ? kana : romaji);
+    if (jaVoice) { u.voice = jaVoice; u.lang = jaVoice.lang; } else u.lang = "en-GB";
+    u.rate = jaVoice ? 1.05 : 1; u.pitch = .9; u.volume = .95;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function sayEn(text) {
+  if (muted || G.demo || !("speechSynthesis" in window)) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-GB"; u.rate = 1.15; speechSynthesis.speak(u); } catch (e) {}
+}
+
+// ---------- game state ----------
+const G = { state: "menu", demo: true, P: [], t: 0, stT: 0, clock: 0, gs: false, parts: [], dust: [], shake: 0, caption: null, capUntil: 0, sig: null, note: null,
+  call: null, gr: null, act: null, pending: null, cam: 0, refX: 0, refArms: null, winner: -1, endWhy: "", total: 240 };
+const other = f => G.P[1 - f.side];
+
+function makeJudoka(side, human, levelKey) {
+  const f = { side, face: side ? -1 : 1, human, x: side ? MARK : -MARK, v: 0, bal: 0, grip: 0, reach: 0, regrip: 0, lastStep: -9, stepStart: -9, stepDir: 0, idle: 0, stun: 0,
+    pose: clonePose(POSE.stand), spec: null, st: "stand", act: null, waza: 0, ippon: false, shido: 0, pushT: -9,
+    input: { move: 0, grip: false, throw: false, sweep: false, power: false, mash: false, tech: null }, prev: {},
+    teaUntil: -9, jpnUntil: -9, bearUntil: -9, bjj: false, charges: 0,
+    bot: null, label: "", stats: { att: 0, counters: 0, pins: 0 } };
+  if (!human) f.bot = new Bot(f, LEVELS[levelKey]);
+  return f;
+}
+
+function startGame(demo) {
+  G.demo = !!demo;
+  const two = settings.mode === "2p";
+  G.P = [makeJudoka(0, !demo, "medium"), makeJudoka(1, !demo && two, demo ? "medium" : settings.level)];
+  if (demo) G.P[0].bot.lv = LEVELS.medium;
+  G.P[0].belt = BELTS[settings.belt1]; G.P[1].belt = BELTS[settings.belt2];
+  G.P[0].nat = NATIONS[settings.nat1]; G.P[1].nat = NATIONS[settings.nat2];
+  for (const f of G.P) { f.natKey = f.side ? settings.nat2 : settings.nat1; f.charges = f.nat.power ? (settings.mins >= 4 ? 2 : 1) : 0; }
+  G.P[0].label = demo ? "Bot" : two ? "Player 1" : "You";
+  G.P[1].label = demo ? "Bot" : two ? "Player 2" : "Bot · " + LEVELS[settings.level].name;
+  G.t = 0; G.parts = []; G.dust = []; G.gs = false; G.total = MINS[settings.mins]; G.clock = G.total;
+  G.note = null; G.pending = null; G.protest = null; G.winner = -1; TIMERS.length = 0; G.act = null; G.gr = null; G.sig = null;
+  G.cam = 0; G.refX = 0; G.refArms = { L: [.12, .06, 0], R: [.12, .06, 0] };
+  resetPositions();
+  toReady();
+  $("menu").hidden = !demo; $("overOv").hidden = true; $("pauseOv").hidden = true;
+  $("hudBtns").hidden = demo;
+  setTouch(!demo);
+}
+function resetPositions() {
+  G.P[0].x = -MARK; G.P[1].x = MARK;
+  for (const f of G.P) {
+    f.face = f.side ? -1 : 1; f.v = 0; f.bal = 0; f.grip = 0; f.reach = 0; f.regrip = 0; f.stun = 0; f.act = null; f.st = "stand";
+    f.pose = clonePose(POSE.stand); f.teaUntil = -9;
+    if (f.bot) f.bot.reset();
+  }
+  G.act = null; G.gr = null;
+}
+function toReady() { G.state = "ready"; G.stT = 0; G.sig = null; }
+function setState(s) { G.state = s; G.stT = 0; }
+function caption(ja, en, d) { G.caption = { ja, en }; G.capUntil = G.t + (d || 2); }
+function signal(sig, side, d) { G.sig = { sig, side, until: G.t + (d || 1.4) }; }
+function note(title, en, d) { G.note = { title, en, until: G.t + (d || 2.4) }; }
+
+// ---------- standing actions ----------
+const gapOf = () => Math.abs(G.P[1].x - G.P[0].x);
+const canAct = f => G.state === "fight" && !f.act && f.stun <= 0 && G.t >= f.teaUntil && f.st === "stand";
+function tryGrip(f) {
+  const o = other(f);
+  if (!canAct(f) || f.reach > 0) return;
+  if (f.grip <= 0) {
+    if (gapOf() > GRIP_RANGE || G.t < f.regrip) return;
+    f.reach = .22; sfx.step();
+  } else if (o.grip > 0) {
+    // break the opponent's grip
+    if (G.t < o.bearUntil) { note("Bear hug", "That grip is not coming off", 1.4); return; }
+    if (Math.random() < .78) { o.grip = 0; o.regrip = G.t + .8; f.grip = Math.max(.3, f.grip - .2); sfx.rip(); }
+  } else f.grip = Math.min(1, f.grip + .12);
+}
+function techFromInput(f) {
+  if (f.input.tech) return f.input.tech;
+  return f.input.move > 0 ? "osoto" : f.input.move < 0 ? "seoi" : "uchi";
+}
+function tryThrow(f, key) {
+  const o = other(f);
+  if (G.state !== "fight" || f.stun > 0 || G.t < f.teaUntil || f.st !== "stand") return;
+  // a throw pressed while the opponent is turning in is a counter attempt
+  if (o.act && o.act.phase === "entry" && !f.act) { tryCounter(f, o); return; }
+  if (f.act || gapOf() > GRIP_RANGE + .15) return;
+  const T = TECH[key];
+  f.act = { key, tech: T, phase: "entry", t: 0, x0: f.x, uke: o };
+  f.idle = 0; f.stats.att++; sfx.kiai();
+}
+function tryCounter(f, o) {
+  const a = o.act;
+  if (G.t < o.jpnUntil || a.countered) return;
+  a.countered = true;
+  const ok = f.grip > .15 && Math.abs(f.bal) < .6 && Math.random() < .72;
+  if (!ok) { f.bal = clamp(f.bal + .35 * (a.tech.kz || 1), -1, 1); note("Counter missed", "", 1); return; }
+  o.act = null; o.stun = 0;
+  f.stats.counters++;
+  const key = COUNTER_OF[a.key];
+  const q = .3 + .34 * Math.random() + (G.t < f.jpnUntil ? .6 : 0);
+  launchThrow(f, o, key, q);
+  sfx.kiai();
+}
+function throwQuality(f, o, T) {
+  let kz;
+  if (T.kz > 0) kz = o.bal; else if (T.kz < 0) kz = -o.bal;
+  else kz = (G.t - o.stepStart < .16 ? .62 : -.3) + .2 * Math.abs(o.bal);
+  // who owns the grip matters as much as the balance
+  let q = .02 + .27 * (f.grip - o.grip) + .65 * kz + .14 * randn();
+  if (f.grip <= .05) q -= .45;
+  // uke blocks by sitting back against forward throws or leaning in against the reap
+  const om = o.input.move;
+  if (T.kz > 0 && om < 0) q -= .32; else if (T.kz < 0 && om > 0) q -= .32;
+  if (G.t < f.jpnUntil) q += .15;
+  return q;
+}
+function resultOf(q) { return q < .12 ? "fail" : q < .38 ? "none" : q < .67 ? "waza" : "ippon"; }
+function launchThrow(f, o, key, q) {
+  const T = TECH[key];
+  let res = resultOf(q);
+  if (res === "waza" && G.t < f.jpnUntil) res = "ippon";
+  if (res === "fail") {
+    f.act = null; f.stun = .6; f.bal = clamp(T.kz > 0 ? .7 : T.kz < 0 ? -.4 : .3, -1, 1); f.grip *= .6;
+    caption(T.name, "Blocked · no throw", 1.2);
+    return;
+  }
+  const dir = Math.sign(o.x - f.x) || f.face;
+  const ukeFace = -dir;
+  let land, apex, rot;
+  if (T.fall === "over") { land = f.x - dir * 1.0; apex = 1.95; rot = -1.5 * Math.PI; }
+  else if (T.fall === "back") { land = o.x + dir * .9; apex = 1.15; rot = .5 * Math.PI; }
+  else { land = o.x + dir * .3; apex = .95; rot = .5 * Math.PI; }
+  if (res === "none") { rot = T.fall === "over" ? -.5 * Math.PI : -.45 * Math.PI; apex *= .75; land = T.fall === "over" ? f.x - dir * .75 : land; }
+  if (T.fall === "over" && T.key !== "uranage") f.turn = true;
+  f.act = { key, tech: T, phase: "exec", t: 0, uke: o, q, res, x0: f.x, ux0: o.x, land, apex, rot, dir, ukeFace };
+  o.st = "air"; o.grip = 0; o.act = null; f.reach = 0; o.reach = 0;
+  G.act = f.act; G.act.tori = f;
+  setState("throw");
+  sfx.whoosh();
+}
+function updAct(f, dt) {
+  const a = f.act; if (!a) return;
+  a.t += dt;
+  const o = a.uke;
+  if (a.phase === "entry") {
+    const k = Math.min(1, a.t / a.tech.entry);
+    const dir = Math.sign(o.x - f.x) || f.face;
+    const want = o.x - dir * a.tech.gap;
+    f.x += (want - f.x) * Math.min(1, dt * 14);
+    f.pose = mixPose(f.pose, POSE[a.tech.pin], Math.min(1, dt * 16));
+    if (k >= 1) {
+      const q = throwQuality(f, o, a.tech);
+      launchThrow(f, o, a.key, q);
+    }
+  }
+}
+
+// ---------- scores, calls and penalties ----------
+function techCall(T, res) {
+  const r = res === "ippon" ? ["いっぽん", "Ippon!"] : res === "waza" ? ["わざあり", "Waza-ari!"] : null;
+  if (r) say(T.kana + "、" + r[0], T.name + "! " + r[1]);
+  else say(T.kana, T.name);
+}
+function award(s, kind, T, why) {
+  const f = G.P[s], o = other(f);
+  if (kind === "ippon") f.ippon = true; else f.waza++;
+  const awasete = kind === "waza" && f.waza >= 2;
+  const name = T ? T.name : why === "pin" ? "Osaekomi" : "";
+  if (kind === "ippon" || awasete) {
+    signal("ippon", s, 2.6);
+    caption(awasete ? "Waza-ari awasete ippon!" : "Ippon!", (name ? name + " · " : "") + SIDE[s].name + " wins", 3);
+    if (T) say(T.kana + "、" + (awasete ? "わざあり、あわせていっぽん" : "いっぽん"), T.name + "! " + (awasete ? "Waza-ari awasete ippon!" : "Ippon!"));
+    else say(awasete ? "わざあり、あわせていっぽん" : "いっぽん", awasete ? "Waza-ari awasete ippon!" : "Ippon!");
+    sfx.crowd(true); sfx.gong();
+    G.pending = { against: o.side, kind: awasete ? "awasete" : "ippon", until: G.t + 2.4, s };
+    endContest(s, awasete ? "Waza-ari awasete ippon" : "Ippon" + (name ? " · " + name : ""));
+    return true;
+  }
+  signal("waza", s, 1.8);
+  caption("Waza-ari!", (name ? name + " · " : "") + SIDE[s].name, 2.2);
+  if (T) techCall(T, "waza"); else say("わざあり", "Waza-ari!");
+  sfx.crowd(false);
+  G.pending = { against: o.side, kind: "waza", until: G.t + 2.4, s };
+  if (G.gs) { endContest(s, "Golden score · waza-ari"); return true; }
+  return false;
+}
+function giveShido(s, why) {
+  const f = G.P[s];
+  f.shido++;
+  if (f.shido >= 3) {
+    G.call = { sigs: [{ sig: "matte", d: .8 }, { sig: "hansoku", side: s, d: 2 }], ja: "Hansoku-make", en: SIDE[s].name + ": third shido, disqualified", kana: "はんそくまけ" };
+    G.pending = null;
+    G.after = () => endContest(1 - s, "Hansoku-make");
+  } else {
+    G.call = { sigs: [{ sig: "matte", d: .8 }, { sig: "shido", side: s, d: 1.6 }], ja: "Shido", en: SIDE[s].name + " · " + why, kana: "しどう" };
+    G.pending = { against: s, kind: "shido", until: G.t + 3, s: 1 - s };
+    G.after = null;
+  }
+}
+function halt(reason, side) {
+  // "Matte": stop, then any penalty, then back to the marks
+  G.act = null; G.gr = null;
+  for (const f of G.P) { f.act = null; f.grip = 0; f.reach = 0; }
+  G.call = { sigs: [{ sig: "matte", d: 1.2 }], ja: "Matte", en: reason === "ground" ? "No progress on the ground" : reason === "toketa" ? "The hold is broken" : "Wait", kana: "まて" };
+  G.after = null;
+  if (reason === "jogai") giveShido(side, "stepping out of the contest area");
+  else if (reason === "forced") giveShido(side, "forcing the opponent out");
+  else if (reason === "passive") { if (side === 2) { giveShido(0, "non-combativity"); G.P[1].shido++; G.call.en = "Both · non-combativity"; G.call.both = true; } else giveShido(side, "non-combativity"); }
+  setState("halt");
+  G.call.total = G.call.sigs.reduce((a, s) => a + s.d, 0);
+  G.call.said = false;
+  sfx.call();
+}
+function timeUp() {
+  const [A, B] = G.P;
+  const sa = A.waza, sb = B.waza;
+  if (sa !== sb) { endContest(sa > sb ? 0 : 1, "Waza-ari at the bell"); sfx.bell(); return; }
+  // tied: golden score, first score wins
+  G.act = null; G.gr = null;
+  for (const f of G.P) { f.act = null; f.grip = 0; }
+  G.call = { sigs: [{ sig: "matte", d: 1.4 }], ja: "Golden score", en: "First score wins", kana: "ゴールデンスコア" };
+  G.call.total = 1.8; G.call.said = false; G.after = () => { G.gs = true; G.clock = 0; };
+  setState("halt"); sfx.bell();
+}
+function endContest(winner, why) {
+  G.winner = winner; G.endWhy = why;
+  G.act = null; G.gr = G.gr && G.gr.pinned ? G.gr : null;
+  setState("end");
+}
+
+// ---------- superpowers ----------
+function canPower(f) {
+  if (!f.nat || !f.nat.power || f.charges <= 0) return false;
+  if (f.nat.when === "call") return !!(G.pending && G.pending.against === f.side && G.t < G.pending.until && (f.natKey !== "bel" || G.pending.kind !== "shido"));
+  if (f.natKey === "bra") return (G.state === "fight" || G.state === "ground" || G.state === "throw") && !f.bjj;
+  return G.state === "fight" && f.st === "stand";
+}
+function usePower(f) {
+  if (!canPower(f)) return;
+  const o = other(f);
+  f.charges--; sfx.power();
+  switch (f.natKey) {
+    case "bel": compromise(f); break;
+    case "ita": protest(f); break;
+    case "jpn": f.jpnUntil = G.t + 8; note("Textbook ippon", "Japan · a throw that scores is ippon", 2.4); break;
+    case "geo": f.bearUntil = G.t + 7; if (gapOf() < GRIP_RANGE + .2) f.grip = 1; note("Bear hug", "Georgia · an unbreakable grip, double kuzushi", 2.4); break;
+    case "bra":
+      f.bjj = true; note("Jiu-jitsu", "Brazil · the next ground fight is yours", 2.4);
+      if (G.state === "ground") bjjNow(f);
+      break;
+    case "gbr": o.teaUntil = G.t + 2.6; o.grip = 0; o.act = o.act && o.act.phase === "entry" ? null : o.act; note("Tea time", SIDE[o.side].name + " politely accepts a cup of tea", 2.4); sayEn("Tea?"); break;
+  }
+}
+function revokeLast(p) {
+  const f = G.P[p.s];
+  if (p.kind === "ippon") f.ippon = false; else if (p.kind === "waza" || p.kind === "awasete") f.waza = Math.max(0, f.waza - 1);
+  else if (p.kind === "shido") G.P[p.against].shido = Math.max(0, G.P[p.against].shido - 1);
+}
+function resumeAfterAnnul() {
+  // the contest goes on: back to matte and the marks (or keep the hold if one is on)
+  G.winner = -1;
+  if (G.gr && G.gr.pinned && G.state === "ground") return;
+  G.gr = null; G.act = null;
+  G.call = { sigs: [{ sig: "matte", d: 1 }], ja: "Matte", en: "The contest continues", kana: "まて", total: 1, said: true };
+  G.after = null; setState("halt");
+}
+function compromise(f) {
+  const p = G.pending; G.pending = null;
+  revokeLast(p);
+  const [A, B] = G.P;
+  const lvl = Math.min(1, Math.max(A.waza, B.waza, 1));
+  A.waza = B.waza = lvl; A.ippon = B.ippon = false;
+  signal("compromise", -1, 2.2);
+  note("Belgian compromise", "After long negotiations: one waza-ari each", 2.8);
+  caption("Waza-ari, waza-ari", "Everybody gets one", 2.6);
+  if (G.state === "end") resumeAfterAnnul();
+}
+function protest(f) {
+  const p = G.pending; G.pending = null;
+  G.protest = { side: f.side, t: G.t, p, done: false };
+  note("Protesta!", SIDE[f.side].name + " protests to the referee", 1.6);
+  sayEn("Ma dai, arbitro!");
+}
+function updProtest() {
+  const pr = G.protest; if (!pr || pr.done || G.t - pr.t < 1.6) return;
+  pr.done = true; G.protest = null;
+  if (Math.random() < .5) {
+    revokeLast(pr.p);
+    signal("torikeshi", -1, 1.6); caption("Torikeshi", "The referee cancels the call", 2); say("とりけし", "Torikeshi");
+    if (G.state === "end") resumeAfterAnnul();
+  } else {
+    G.P[pr.side].shido++;
+    signal("shido", pr.side, 1.6); caption("Shido", SIDE[pr.side].name + " · protesting", 2); say("しどう", "Shido");
+    if (G.P[pr.side].shido >= 3 && G.state !== "end") endContest(1 - pr.side, "Hansoku-make");
+  }
+}
+
+// ---------- ground fight (ne-waza) ----------
+function startGround(tori, uke, onBack) {
+  G.gr = { tori, uke, onBack, pinned: false, hold: 0, esc: 0, t: 0, tries: 0, cool: 0, waza10: false, lock: 0 };
+  tori.st = "kneel"; uke.st = onBack ? "back" : "turtle";
+  setState("ground");
+  if (tori.bjj) bjjNow(tori);
+}
+function bjjNow(f) {
+  const g = G.gr; if (!g) return;
+  f.bjj = false;
+  if (g.tori === f) { if (!g.pinned) startPin(); g.lock = 10; }
+  else { g.esc = 1; }
+}
+function startPin() {
+  const g = G.gr;
+  g.pinned = true; g.hold = 0; g.esc = 0; g.tori.st = "pin"; g.uke.st = "back";
+  g.tori.stats.pins++;
+  signal("osaekomi", g.tori.side, 999);
+  caption("Osaekomi!", SIDE[g.tori.side].name + " holds", 1.6); say("おさえこみ", "Osae-komi!"); sfx.call();
+  if (g.uke.bjj) { g.uke.bjj = false; g.esc = 1; g.lock = 0; note("Jiu-jitsu", "Brazil · slips straight out of the hold", 2); }
+}
+function updGround(dt) {
+  const g = G.gr; if (!g || g.escT) return;
+  g.t += dt; g.cool -= dt;
+  const T = g.tori, U = g.uke;
+  // positions: tori kneels over uke's chest
+  const ux = U.x, chest = U.st === "turtle" ? ux + U.face * .1 : ux - U.face * .32;
+  const side = Math.sign(T.x - chest) || -1;
+  T.face = -side;
+  T.x += (chest + side * (g.pinned ? .52 : .45) - T.x) * Math.min(1, dt * 8);
+  if (!g.pinned) {
+    if ((T.input.grip && !T.prev.grip) || (T.input.throw && !T.prev.throw)) {
+      if (g.cool <= 0) {
+        g.tries++; g.cool = .6;
+        const ch = (g.onBack ? .62 : .32) + (U.input.move ? -.08 : 0);
+        if (Math.random() < ch) startPin(); else { note("Hold slips", "", .8); U.st = "turtle"; g.onBack = false; }
+      }
+    }
+    if (U.input.mash && !U.prev.mash) g.esc += .07;
+    if (g.esc >= 1 || g.t > 4.2) { halt("ground"); return; }
+    return;
+  }
+  // osaekomi: uke struggles, tori holds on
+  if (G.t >= T.teaUntil) g.hold += dt;
+  const press = U.input.mash && !U.prev.mash, keep = T.input.mash && !T.prev.mash;
+  if (g.lock > 0) g.lock -= dt;
+  else {
+    if (press) g.esc += g.onBack ? .036 : .045;
+    if (keep) g.esc = Math.max(0, g.esc - .022);
+  }
+  if (G.t < T.teaUntil) g.esc += dt * .5;
+  if (g.esc >= 1) {
+    G.sig = null;
+    signal("toketa", T.side, 1.1); caption("Toketa", "Escaped after " + g.hold.toFixed(0) + " s", 1.5); say("とけた", "Toketa!");
+    G.gr.pinned = false; U.st = "turtle";
+    G.gr.escT = G.t;
+    setTimeout0(() => halt("toketa"), .9);
+    return;
+  }
+  if (g.hold >= 10 && !g.waza10) {
+    g.waza10 = true;
+    if (T.waza >= 1) { G.sig = null; award(T.side, "waza", null, "pin"); return; }
+    T.waza++; caption("Waza-ari!", "Osaekomi · 10 seconds", 1.8); say("わざあり", "Waza-ari!"); sfx.crowd(false);
+    G.pending = { against: U.side, kind: "waza", until: G.t + 2.4, s: T.side };
+    if (G.gs) { G.sig = null; signal("waza", T.side, 1.8); endContest(T.side, "Golden score · osaekomi"); return; }
+  }
+  if (g.hold >= 20) { G.sig = null; T.waza = Math.max(0, T.waza - 1); award(T.side, "ippon", null, "pin"); }
+}
+// a tiny one-shot timer on game time
+const TIMERS = [];
+function setTimeout0(fn, d) { TIMERS.push({ at: G.t + d, fn }); }
+
+// ---------- per-judoka update ----------
+function updJudoka(f, dt) {
+  const o = other(f);
+  if (f.stun > 0) f.stun -= dt;
+  if (f.reach > 0) {
+    f.reach -= dt;
+    if (f.reach <= 0) { if (gapOf() <= GRIP_RANGE + .1 && G.state === "fight") { f.grip = .55; sfx.grip(); } }
+  }
+  if (G.state === "fight" && f.st === "stand") {
+    // walking (local +1 is toward the opponent)
+    let mv = f.input.move;
+    if (f.act || f.stun > 0 || G.t < f.teaUntil || f.reach > 0) mv = 0;
+    const tv = mv * WALK * (f.grip > 0 && o.grip > 0 ? .8 : 1);
+    f.v += (tv - f.v) * Math.min(1, dt * 10);
+    if (Math.abs(f.v) > .2) { if (G.t - f.lastStep > .08 || Math.sign(f.v) !== f.stepDir) f.stepStart = G.t; f.lastStep = G.t; f.stepDir = Math.sign(f.v); }
+    if (mv > 0 && f.grip > 0) f.pushT = G.t;
+    f.x += f.face * f.v * dt;
+    // kuzushi: moving with a grip pulls or pushes the opponent off balance; your own steps lean you a little
+    const dbl = G.t < f.bearUntil ? 2 : 1;
+    if (f.grip > 0 && o.st === "stand") {
+      o.bal += -f.v * f.grip * 1.05 * dbl * (1 - .35 * o.grip) * dt;
+      // being dragged makes uke step too
+      if (f.v < -.2) { if (G.t - o.lastStep > .08) o.stepStart = G.t; o.lastStep = G.t; }
+    }
+    f.bal += f.v * .32 * dt;
+    if (f.grip > 0) f.grip = Math.min(1, f.grip + .3 * dt);
+    if (G.t < f.bearUntil && f.grip > 0) f.grip = 1;
+  } else f.v = 0;
+  f.bal -= f.bal * 2.1 * dt; f.bal = clamp(f.bal, -1, 1);
+  updAct(f, dt);
+}
+function couple(dt) {
+  // keep apart, and a gripping judoka drags the other along
+  const [A, B] = G.P;
+  if (G.state !== "fight" && G.state !== "ready") return;
+  for (const f of G.P) if (f.st === "stand" && !f.act) f.face = Math.sign(other(f).x - f.x) || f.face;
+  let gap = B.x - A.x;
+  const entry = A.act || B.act;
+  const minG = entry ? .36 : MIN_GAP;
+  if (gap < minG) { const ov = minG - gap; A.x -= ov / 2; B.x += ov / 2; }
+  gap = B.x - A.x;
+  const held = A.grip > 0 || B.grip > 0, maxG = 1.06;
+  if (held && gap > maxG) {
+    // whoever is moving away drags the other
+    const ov = gap - maxG, aw = Math.max(0, -A.v * A.face) + .01, bw = Math.max(0, -B.v * B.face) + .01;
+    if (A.grip <= 0 && B.grip <= 0) {} else { A.x += ov * (bw / (aw + bw)); B.x -= ov * (aw / (aw + bw)); }
+    if (gap > GRIP_RANGE + .3) { A.grip = B.grip = 0; }
+  }
+  if (!held && gap > GRIP_RANGE + .1) { A.grip = 0; B.grip = 0; }
+}
+
+function updPose(f, dt) {
+  const o = other(f);
+  let target = POSE.stand, k = 12;
+  if (G.state === "end" && G.winner === f.side && G.stT > .9 && f.st === "stand") target = POSE.win;
+  else if (f.act && f.act.phase === "entry") return;
+  else if (f.act && f.act.phase === "exec") target = POSE[f.act.tech.pout], k = 7;
+  else if (f.stun > 0) target = POSE.stunned;
+  else if (G.t < f.teaUntil) target = POSE.tea;
+  else if (f.st === "kneel") target = POSE.kneel;
+  else if (f.st === "pin") target = POSE.pin;
+  else if (f.st === "turtle") target = POSE.turtle;
+  else if (f.reach > 0 || f.grip > 0) {
+    target = clonePose(POSE.reach);
+    const g = Math.abs(o.x - f.x);
+    if (f.grip > 0) { target.fh = [g - .18, 1.34]; target.bh = [g - .22, 1.1]; }
+    else { target.fh = [Math.min(g - .15, .75), 1.32]; target.bh = [Math.min(g - .2, .6), 1.12]; }
+  }
+  f.pose = mixPose(f.pose, target, Math.min(1, dt * k));
+  if (f.st !== "stand") f.turn = false;
+}
+// What to draw: pose, rotation about the hip (local), and where the local origin sits in the world.
+function specOf(f) {
+  const a = G.act;
+  if (a && a.uke === f && G.state === "throw") {
+    const k = clamp(a.t / a.tech.dur, 0, 1), e = ease(k);
+    const hx = a.ux0 + (a.land - a.ux0) * e;
+    const yEnd = a.res === "none" ? .3 : .17;
+    const hy = .94 + (yEnd - .94) * e + Math.sin(Math.PI * Math.min(1, k * 1.05)) * (a.apex - .55);
+    return { pose: POSE.air, rot: a.rot * ease(Math.min(1, k * 1.15)), hx, hy, face: a.ukeFace, hide: false };
+  }
+  if (f.st === "back" || f.st === "flat") return { pose: POSE.flat, rot: .5 * Math.PI, hx: f.x, hy: .17, face: f.face };
+  if (f.st === "prone") return { pose: POSE.flat, rot: -.5 * Math.PI, hx: f.x, hy: .22, face: f.face };
+  // standing poses lean with their balance
+  const p = clonePose(f.pose);
+  if (f.st === "stand" && !(f.act && f.act.phase === "exec")) {
+    const lean = -f.bal * .32;
+    for (const n of ["sh", "hd", "fh", "bh"]) p[n] = rotAbout(p[n], p.hip, lean);
+  }
+  return { pose: p, rot: 0, hx: f.x + f.face * p.hip[0], hy: p.hip[1], face: f.face };
+}
+
+// ---------- bot ----------
+class Bot {
+  constructor(f, lv) { this.f = f; this.lv = lv; this.reset(); }
+  reset() { this.next = 0; this.hold = 0; this.reactFor = null; this.choice = ""; this.reactAt = 0; this.mashAt = 0; this.pinAt = -1; this.plan = 0; this.planUntil = 0; }
+  update() {
+    const f = this.f, o = other(f), lv = this.lv, I = f.input;
+    I.move = 0; I.grip = I.throw = I.sweep = I.power = I.mash = false; I.tech = null;
+    // superpowers
+    if (canPower(f) && Math.random() < this.powerWant(f, o)) { I.power = true; return; }
+    if (G.state === "ground") { this.ground(f, o, lv, I); return; }
+    if (G.state !== "fight" || f.st !== "stand" || f.stun > 0 || G.t < f.teaUntil || f.act) return;
+    // react to an attack: counter, block or nothing
+    if (o.act && o.act.phase === "entry") {
+      if (this.reactFor !== o.act) {
+        this.reactFor = o.act; this.reactAt = G.t + lv.react * .6 + Math.abs(randn()) * lv.jit;
+        this.choice = Math.random() < lv.counter ? "counter" : Math.random() < lv.block ? "block" : "none";
+      }
+      if (G.t >= this.reactAt) {
+        if (this.choice === "counter") { I.throw = true; this.choice = "done"; }
+        else if (this.choice === "block") I.move = o.act.tech.kz > 0 ? -1 : o.act.tech.kz < 0 ? 1 : 0;
+      }
+      return;
+    }
+    const gap = Math.abs(o.x - f.x), behind = END - f.face * -f.x, ahead = END + f.face * -o.x;
+    if (G.t < this.next) { I.move = this.hold; if (behind < .6 && this.hold < 0) I.move = 0; return; }
+    this.next = G.t + lv.think[0] + Math.random() * (lv.think[1] - lv.think[0]);
+    this.hold = 0;
+    if (f.grip <= 0) {
+      if (o.grip > 0 && Math.random() < lv.brk) { this.hold = -1; return; }
+      if (gap > GRIP_RANGE - .08) { this.hold = Math.random() < .85 ? 1 : 0; return; }
+      if (G.t >= f.regrip && Math.random() < .7 + lv.take * .3) { I.grip = true; return; }
+      this.hold = Math.random() < .3 && behind > 1.2 ? -1 : 0; return;
+    }
+    if (o.grip > f.grip + .1 && Math.random() < lv.brk * .7) { I.grip = true; return; }
+    if (G.t - o.stepStart < .1 && gap < 1 && Math.random() < lv.sweep) { I.sweep = true; return; }
+    const fwd = o.bal > lv.thr, back = o.bal < -lv.thr;
+    if ((fwd || back) && Math.random() < lv.take) { I.throw = true; I.tech = fwd ? (Math.random() < .5 ? "seoi" : "uchi") : "osoto"; return; }
+    if (Math.random() < lv.err || f.idle > PASSIVE - 6 - Math.random() * 6) {
+      I.throw = true; I.tech = ["seoi", "uchi", "osoto"][Math.floor(Math.random() * 3)]; return;
+    }
+    // work for kuzushi: pull (step back) or push (step in) in bursts; mind the edge
+    if (G.t > this.planUntil) { this.plan = Math.random() < .5 ? -1 : 1; this.planUntil = G.t + .5 + Math.random() * .9; }
+    let p = this.plan;
+    if (behind < 1.0) p = 1;
+    if (ahead < .8 && p > 0 && Math.random() < .7) p = -1;
+    this.hold = Math.random() < .2 ? 0 : p;
+  }
+  ground(f, o, lv, I) {
+    const g = G.gr; if (!g) return;
+    if (g.tori === f) {
+      if (!g.pinned) { if (this.pinAt < 0) this.pinAt = G.t + lv.pin * (.7 + .6 * Math.random()); if (G.t >= this.pinAt) { I.grip = true; this.pinAt = G.t + .7; } }
+      else if (G.t >= this.mashAt) { I.mash = true; this.mashAt = G.t + 1 / (lv.mash * .55) * (.7 + .6 * Math.random()); }
+    } else if (G.t >= this.mashAt) { I.mash = true; this.mashAt = G.t + 1 / lv.mash * (.7 + .6 * Math.random()); }
+    if (!g.pinned && g.tori !== f) this.pinAt = -1;
+  }
+  powerWant(f, o) {
+    switch (f.natKey) {
+      case "bel": return .03;
+      case "ita": return G.pending && G.pending.kind === "shido" ? .01 : .025;
+      case "jpn": return f.grip > .5 && Math.abs(o.bal) > .2 ? .01 : 0;
+      case "geo": return o.grip > 0 ? .004 : 0;
+      case "bra": return G.state === "ground" ? .05 : 0;
+      case "gbr": return gapOf() < 1.6 && o.grip > 0 ? .003 : 0;
+    }
+    return 0;
+  }
+}
+
+// ---------- input ----------
+const KEYMAP = {
+  KeyA: [0, "left"], KeyD: [0, "right"], KeyW: [0, "grip"], KeyS: [0, "throw"], KeyE: [0, "sweep"], KeyQ: [0, "power"], KeyF: [0, "power"], Space: [0, "sweep"],
+  ArrowLeft: [1, "left"], ArrowRight: [1, "right"], ArrowUp: [1, "grip"], ArrowDown: [1, "throw"], Slash: [1, "sweep"], ShiftRight: [1, "sweep"], Period: [1, "power"], Enter: [1, "power"],
+};
+const TOUCH = [{}, {}], TAPS = [{}, {}], KEYS_DOWN = new Set(), KEYS_TAPPED = new Set();
+addEventListener("keydown", e => {
+  if (e.code === "KeyP" || e.code === "Escape") { if (G.state !== "menu" && !G.demo && G.state !== "over") { togglePause(); e.preventDefault(); } return; }
+  if (!KEYMAP[e.code] || e.target.tagName === "SELECT" || !$("menu").hidden || !$("overOv").hidden || !$("pauseOv").hidden) return;
+  e.preventDefault(); initAudio(); KEYS_DOWN.add(e.code); if (!e.repeat) KEYS_TAPPED.add(e.code);
+});
+addEventListener("keyup", e => KEYS_DOWN.delete(e.code));
+addEventListener("blur", () => KEYS_DOWN.clear());
+function keyState(side) {
+  const k = {};
+  for (const set of [KEYS_DOWN, KEYS_TAPPED]) for (const code of set) { const m = KEYMAP[code]; if (!m) continue; const p = settings.mode === "2p" ? m[0] : 0; if (p === side) { k[m[1]] = true; if (set === KEYS_TAPPED) KEYS_TAPPED.delete(code); } }
+  return k;
+}
+function humanInput(f) {
+  const I = f.input, K = keyState(f.side), T = TOUCH[f.side], tp = TAPS[f.side];
+  const on = a => !!(K[a] || T[a] || tp[a]);
+  const left = on("left"), right = on("right");
+  I.move = (right ? 1 : 0) - (left ? 1 : 0);
+  I.move *= f.face;                                  // local: +1 toward the opponent
+  I.grip = on("grip"); I.throw = on("throw"); I.sweep = on("sweep"); I.power = on("power"); I.tech = null;
+  // any button counts as a struggle on the ground
+  const pl = f.prev, newLeft = left && !pl._left, newRight = right && !pl._right;
+  I.mash = (I.grip && !pl.grip) || (I.throw && !pl.throw) || (I.sweep && !pl.sweep) || newLeft || newRight;
+  I._left = left; I._right = right;
+  for (const a in tp) tp[a] = false;
+}
+function actOnInput(f) {
+  const I = f.input, p = f.prev;
+  if (I.power && !p.power) usePower(f);
+  if (G.state === "fight") {
+    if (I.throw && !p.throw) tryThrow(f, techFromInput(f));
+    else if (I.sweep && !p.sweep) tryThrow(f, "deashi");
+    else if (I.grip && !p.grip) tryGrip(f);
+  }
+}
+function savePrev(f) { const I = f.input; f.prev = { move: I.move, grip: I.grip, throw: I.throw, sweep: I.sweep, power: I.power, mash: I.mash, _left: I._left, _right: I._right }; }
+
+// ---------- main step ----------
+function step(dt) {
+  G.t += dt; G.stT += dt;
+  const [A, B] = G.P;
+  for (let i = TIMERS.length - 1; i >= 0; i--) if (G.t >= TIMERS[i].at) { const t = TIMERS.splice(i, 1)[0]; t.fn(); }
+  if (G.state === "ready") {
+    const fast = G.demo ? .6 : 1;
+    if (G.stT < dt * 1.5) { caption(G.gs ? "Golden score" : "Rei", G.gs ? "First score wins" : "Bow", 1.2); }
+    if (G.stT >= 1.1 * fast && G.stT - dt < 1.1 * fast) { caption("Hajime!", "Begin", 1.2); say("はじめ", "Hajime!"); sfx.call(); setState("fight"); }
+  }
+  for (const f of G.P) {
+    if (f.human) humanInput(f);
+    else f.bot.update();
+    actOnInput(f);
+  }
+  if (G.state === "ground") updGround(dt);
+  for (const f of G.P) updJudoka(f, dt);
+  couple(dt);
+  for (const f of G.P) updPose(f, dt);
+  for (const f of G.P) savePrev(f);
+  updProtest();
+  const running = G.state === "fight" || G.state === "throw" || G.state === "ground";
+  if (running && !G.demo) { if (G.gs) G.clock += dt; else G.clock -= dt; }
+  if (G.state === "fight") {
+    for (const f of G.P) if (!f.act) f.idle += dt;
+    // stepping out of the contest area
+    for (const f of G.P) if (!f.act && Math.abs(f.x) > END + .12) {
+      const o = other(f);
+      const forced = o.grip > 0 && G.t - o.pushT < .5 && Math.abs(o.x) <= END + .12;
+      halt(forced ? "forced" : "jogai", forced ? o.side : f.side); break;
+    }
+    if (G.state === "fight") {
+      const pa = A.idle > PASSIVE, pb = B.idle > PASSIVE;
+      if (pa || pb) { if (pa) A.idle = 0; if (pb) B.idle = 0; halt("passive", pa && pb ? 2 : pa ? 0 : 1); }
+    }
+    if (G.state === "fight" && !G.gs && G.clock <= 0 && !G.demo) { G.clock = 0; timeUp(); }
+  }
+  if (G.state === "throw") updThrow(dt);
+  if (G.state === "ground" && !G.gs && G.clock <= 0 && !G.demo && !(G.gr && G.gr.pinned)) { G.clock = 0; timeUp(); }
+  if (G.state === "halt") {
+    const c = G.call;
+    if (!c.said && G.stT > .05) { c.said = true; caption(c.ja, c.en, c.total + .3); say(c.kana, c.ja); }
+    if (G.stT >= c.total * (G.demo ? .7 : 1)) {
+      const after = G.after; G.after = null; G.call = null;
+      if (after) after();
+      if (G.state === "halt") { resetPositions(); toReady(); }
+    }
+  }
+  if (G.state === "end") {
+    if (G.protest) G.stT = Math.min(G.stT, 2.2);
+    if (G.stT > 2.4 && G.stT - dt <= 2.4) { signal("winner", G.winner, 9); if (!G.demo) { caption("Sore-made", SIDE[G.winner].name + " wins · " + G.endWhy, 3); say("それまで", "Sore-made"); } }
+    if (G.stT >= (G.demo ? 3.2 : 3.6)) { if (G.demo) startGame(true); else gameOver(); }
+  }
+  // dust, camera, referee
+  for (const q of G.dust) { q.x += q.vx * dt; q.y += q.vy * dt; q.vy -= 3 * dt; q.life -= dt; }
+  G.dust = G.dust.filter(q => q.life > 0);
+  G.shake = Math.max(0, G.shake - dt * 3);
+  const half = VW / 2 / S, lim = SAFE - half;
+  const want = lim > 0 ? clamp((A.x + B.x) / 2, -lim, lim) : 0;
+  G.cam += (want - G.cam) * Math.min(1, dt * 4);
+  // the referee keeps to one side of the pair, toward the middle of the mat, so the signals stay in view
+  const mid = (A.x + B.x) / 2, rside = mid > .6 ? -1 : mid < -.6 ? 1 : (G.refSide || 1);
+  G.refSide = rside;
+  G.refX += (clamp(mid + rside * 2.6, -SAFE + 1, SAFE - 1) - G.refX) * Math.min(1, dt * 1.2);
+  updRef(dt);
+}
+function updThrow(dt) {
+  const a = G.act; if (!a) { setState("fight"); return; }
+  const f = a.tori, o = a.uke;
+  if (a.t < a.tech.dur) return;
+  // landed
+  f.turn = false; f.act = null; G.act = null;
+  o.x = a.land; o.face = a.ukeFace;
+  f.face = Math.sign(o.x - f.x) || f.face;
+  const big = a.res === "ippon";
+  for (let i = 0; i < (big ? 34 : 18); i++) G.dust.push({ x: o.x + (Math.random() - .5) * 1.4, y: .05, vx: (Math.random() - .5) * 2.4, vy: Math.random() * (big ? 1.8 : 1), life: .5 + Math.random() * .5, r: 3 + Math.random() * 5 });
+  G.shake = big ? 1 : a.res === "waza" ? .55 : .25;
+  sfx.slam(big); sfx.slap();
+  if (a.res === "ippon") { o.st = "flat"; f.st = "stand"; f.pose = clonePose(POSE.stand); setState("fight"); award(f.side, "ippon", a.tech); return; }
+  if (a.res === "waza") {
+    o.st = "back";
+    if (award(f.side, "waza", a.tech)) { f.st = "stand"; return; }
+    startGround(f, o, true); return;
+  }
+  // no score: uke turns out onto the front, and the fight goes to the ground
+  caption(a.tech.name, a.tech.en + " · no score", 1.6); techCall(a.tech, "none");
+  o.st = "turtle"; o.face = Math.sign(f.x - o.x) || o.face;
+  startGround(f, o, false);
+}
+
+// ---------- referee signals: arm angles from straight down (positive = outward, per screen side) ----------
+const REST = [.12, .06, 0];
+function refPose() {
+  const one = (side, arm) => side === 0 ? { L: arm, R: REST } : { L: REST, R: arm };
+  const s = G.sig && G.t < G.sig.until ? G.sig : null;
+  if (G.protest) return { L: [.9, 2.2, 1], R: [.9, 2.2, 1] };
+  if (G.state === "halt" && G.call) {
+    let t = G.stT, c = null;
+    for (const x of G.call.sigs) { if (t < x.d) { c = x; break; } t -= x.d; }
+    if (!c) c = G.call.sigs[G.call.sigs.length - 1];
+    if (c.sig === "matte") return { L: REST, R: [1.55, 3.05, 1] };
+    if (c.sig === "shido") return G.call.both ? { L: [1.3, 1.5, 2], R: [1.3, 1.5, 2] } : one(c.side, [1.3, 1.5, 2]);
+    if (c.sig === "hansoku") return one(c.side, [2.5, 2.7, 2]);
+  }
+  if (G.state === "ready") {
+    if (G.stT < .9 * (G.demo ? .6 : 1)) return { L: REST, R: REST, bow: Math.sin(Math.min(1, G.stT * 2) * Math.PI) };
+    return { L: [.5, .9, 1], R: [.5, .9, 1] };
+  }
+  if (s) {
+    const wob = Math.sin(G.t * 14);
+    switch (s.sig) {
+      case "ippon": return one(s.side, [3.05, 3.1, 1]);
+      case "waza": return one(s.side, [1.55, 1.6, 1]);
+      case "osaekomi": return one(s.side, [.95, .95, 1]);
+      case "toketa": return one(s.side, [1.2 + .3 * wob, 1.2 + .5 * wob, 1]);
+      case "shido": return one(s.side, [1.3, 1.5, 2]);
+      case "torikeshi": { const a = 2.75 + .3 * wob; return { L: REST, R: [a, a + .1, 1] }; }
+      case "compromise": { const a = 1.0 + .4 * Math.sin(G.t * 3); return { L: [a, 2.3, 1], R: [a, 2.3, 1] }; }
+      case "winner": return one(s.side, [2.2, 2.25, 1]);
+    }
+  }
+  return { L: REST, R: REST };
+}
+function updRef(dt) {
+  const t = refPose(), a = G.refArms, r = Math.min(1, dt * 12);
+  for (const s of ["L", "R"]) { a[s][0] += (t[s][0] - a[s][0]) * r; a[s][1] += (t[s][1] - a[s][1]) * r; a[s][2] = t[s][2]; }
+  a.bow = (a.bow || 0) + ((t.bow || 0) - (a.bow || 0)) * r;
+}
+
+// ---------- rendering ----------
+const DISPLAY = "Bungee, Impact, 'Arial Black', sans-serif";
+const BODY = "'Barlow Condensed', 'Arial Narrow', sans-serif";
+const sx = wx => VW / 2 + (wx - G.cam) * S;
+const sy = wy => FLOOR - wy * S;
+const CROWD = []; { let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 280; i++) CROWD.push({ x: rnd(), row: Math.floor(rnd() * 4), c: ["#4a5566", "#5c4a52", "#3f5a5a", "#6b6250", "#50506b", "#2f3d4f", "#6a3a3a"][Math.floor(rnd() * 7)], h: .7 + rnd() * .5 }); }
+
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, FLOOR);
+  g.addColorStop(0, "#0b0f16"); g.addColorStop(.55, "#141b26"); g.addColorStop(1, "#1c2532");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  // light rig
+  for (let i = 0; i < 7; i++) { const x = ((i + .5) / 7) * VW; const lg = ctx.createRadialGradient(x, 30, 2, x, 30, 60); lg.addColorStop(0, "rgba(255,248,225,.35)"); lg.addColorStop(1, "rgba(255,248,225,0)"); ctx.fillStyle = lg; ctx.fillRect(x - 60, 0, 120, 90); }
+  const par = -G.cam * S * .25;
+  for (const c of CROWD) {
+    const y = 300 + c.row * 34, x = ((c.x * (VW + 400) + par) % (VW + 400) + VW + 400) % (VW + 400) - 200;
+    ctx.fillStyle = c.c; ctx.globalAlpha = .45 - c.row * .05;
+    ctx.beginPath(); ctx.arc(x, y - 22 * c.h, 7, 0, 7); ctx.fill();
+    ctx.fillRect(x - 9, y - 16 * c.h, 18, 26);
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#0f141c"; ctx.fillRect(0, 432, VW, 62);
+  ctx.font = "400 24px " + DISPLAY; ctx.textBaseline = "middle"; ctx.textAlign = "center";
+  const off = ((-G.cam * S * .6) % 600 + 600) % 600;
+  for (let x = -600 + off; x < VW + 600; x += 600) { ctx.fillStyle = "rgba(233,196,74,.12)"; ctx.fillText("REI · HAJIME · MATTE · IPPON", x, 463); }
+  const fg = ctx.createLinearGradient(0, 494, 0, VH);
+  fg.addColorStop(0, "#1a222d"); fg.addColorStop(1, "#0c1016");
+  ctx.fillStyle = fg; ctx.fillRect(0, 494, VW, VH - 494);
+}
+function drawMat() {
+  const top = FLOOR - 70, bot = FLOOR + 56, skew = 26;
+  const X = wx => sx(wx);
+  const quad = (a, b, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(X(a) + skew, top); ctx.lineTo(X(b) + skew, top); ctx.lineTo(X(b) - skew, bot); ctx.lineTo(X(a) - skew, bot); ctx.closePath(); ctx.fill(); };
+  quad(-SAFE - .3, SAFE + .3, "#11161e");
+  quad(-SAFE, SAFE, "#2d5fae");
+  quad(-END, END, "#e2bd45");
+  // tatami seams (1 m x 2 m mats)
+  ctx.strokeStyle = "rgba(0,0,0,.16)"; ctx.lineWidth = 1.2;
+  for (let x = -SAFE; x <= SAFE; x += 1) { ctx.beginPath(); ctx.moveTo(X(x) + skew, top); ctx.lineTo(X(x) - skew, bot); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(X(-SAFE) + skew * .1, top + (bot - top) * .45); ctx.lineTo(X(SAFE) + skew * .1, top + (bot - top) * .45); ctx.stroke();
+  const sh = ctx.createLinearGradient(0, top, 0, bot); sh.addColorStop(0, "rgba(255,255,255,.12)"); sh.addColorStop(.5, "rgba(255,255,255,0)"); sh.addColorStop(1, "rgba(0,0,0,.18)");
+  ctx.fillStyle = sh; ctx.fillRect(X(-SAFE) - skew, top, SAFE * 2 * S + skew * 2, bot - top);
+  // start marks: white and blue tape
+  const mark = (wx, col) => { ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(X(wx) + skew * .55, top + (bot - top) * .3); ctx.lineTo(X(wx) + skew * .05, top + (bot - top) * .48); ctx.stroke(); };
+  mark(-MARK, "#f4f2ec"); mark(MARK, "#2559c6");
+}
+function drawReferee() {
+  const sc = S * .62, x0 = VW / 2 + (G.refX - G.cam) * S * .78, yF = FLOOR - 74;
+  const Y = m => yF - m * sc, a = G.refArms, bow = a.bow || 0;
+  ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "#20242c"; ctx.lineWidth = .13 * sc;
+  ctx.beginPath(); ctx.moveTo(x0 - .09 * sc, Y(.92)); ctx.lineTo(x0 - .11 * sc, Y(.06)); ctx.moveTo(x0 + .09 * sc, Y(.92)); ctx.lineTo(x0 + .11 * sc, Y(.06)); ctx.stroke();
+  ctx.fillStyle = "#0d0d0f"; ctx.fillRect(x0 - .2 * sc, Y(.06), .16 * sc, .06 * sc); ctx.fillRect(x0 + .04 * sc, Y(.06), .16 * sc, .06 * sc);
+  const by = bow * .1 * sc;
+  ctx.fillStyle = "#1a1d24";
+  ctx.beginPath(); ctx.moveTo(x0 - .21 * sc, Y(1.44) + by); ctx.lineTo(x0 + .21 * sc, Y(1.44) + by); ctx.lineTo(x0 + .19 * sc, Y(.84)); ctx.lineTo(x0 - .19 * sc, Y(.84)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#f1f3f5"; ctx.beginPath(); ctx.moveTo(x0 - .06 * sc, Y(1.44) + by); ctx.lineTo(x0 + .06 * sc, Y(1.44) + by); ctx.lineTo(x0, Y(1.2) + by); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#c9a227"; ctx.beginPath(); ctx.moveTo(x0 - .018 * sc, Y(1.42) + by); ctx.lineTo(x0 + .018 * sc, Y(1.42) + by); ctx.lineTo(x0, Y(1.22) + by); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#d9a882"; ctx.beginPath(); ctx.arc(x0, Y(1.6) + by * 1.6, .105 * sc, 0, 7); ctx.fill();
+  ctx.fillStyle = "#4a4a4a"; ctx.beginPath(); ctx.arc(x0, Y(1.63) + by * 1.6, .108 * sc, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+  for (const [key, side] of [["L", -1], ["R", 1]]) {
+    const [t1, t2, hand] = a[key];
+    const shx = x0 + side * .2 * sc, shy = Y(1.4) + by;
+    const ex = shx + side * Math.sin(t1) * .3 * sc, ey = shy + Math.cos(t1) * .3 * sc;
+    const hx = ex + side * Math.sin(t2) * .28 * sc, hy = ey + Math.cos(t2) * .28 * sc;
+    ctx.strokeStyle = "#1a1d24"; ctx.lineWidth = .1 * sc;
+    ctx.beginPath(); ctx.moveTo(shx, shy); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.fillStyle = "#d9a882";
+    const ux = side * Math.sin(t2), uy = Math.cos(t2);
+    if (hand === 0) { ctx.beginPath(); ctx.arc(hx + ux * .03 * sc, hy + uy * .03 * sc, .045 * sc, 0, 7); ctx.fill(); }
+    else if (hand === 1) { ctx.save(); ctx.translate(hx + ux * .06 * sc, hy + uy * .06 * sc); ctx.rotate(Math.atan2(uy, ux)); ctx.beginPath(); ctx.ellipse(0, 0, .075 * sc, .035 * sc, 0, 0, 7); ctx.fill(); ctx.restore(); }
+    else { ctx.beginPath(); ctx.arc(hx + ux * .03 * sc, hy + uy * .03 * sc, .04 * sc, 0, 7); ctx.fill(); ctx.strokeStyle = "#d9a882"; ctx.lineWidth = .02 * sc; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + ux * .14 * sc, hy + uy * .14 * sc); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawFlag(fl, x, y, w, h) {
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  if (fl.v) fl.v.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(x + i * w / 3, y, w / 3 + .5, h); });
+  else if (fl.jp) { ctx.fillStyle = "#fff"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#bc002d"; ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, h * .3, 0, 7); ctx.fill(); }
+  else if (fl.geo) { ctx.fillStyle = "#fff"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#e8112d"; ctx.fillRect(x + w * .44, y, w * .12, h); ctx.fillRect(x, y + h * .41, w, h * .18);
+    for (const [cx, cy] of [[.22, .22], [.78, .22], [.22, .78], [.78, .78]]) { ctx.fillRect(x + w * cx - w * .02, y + h * cy - h * .1, w * .04, h * .2); ctx.fillRect(x + w * cx - w * .06, y + h * cy - h * .035, w * .12, h * .07); } }
+  else if (fl.bra) { ctx.fillStyle = "#009c3b"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#ffdf00"; ctx.beginPath(); ctx.moveTo(x + w * .08, y + h / 2); ctx.lineTo(x + w / 2, y + h * .1); ctx.lineTo(x + w * .92, y + h / 2); ctx.lineTo(x + w / 2, y + h * .9); ctx.closePath(); ctx.fill(); ctx.fillStyle = "#002776"; ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, h * .22, 0, 7); ctx.fill(); }
+  else if (fl.uk) {
+    ctx.fillStyle = "#012169"; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = h * .22; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y + h); ctx.moveTo(x + w, y); ctx.lineTo(x, y + h); ctx.stroke();
+    ctx.strokeStyle = "#c8102e"; ctx.lineWidth = h * .08; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.fillRect(x + w * .4, y, w * .2, h); ctx.fillRect(x, y + h * .36, w, h * .28);
+    ctx.fillStyle = "#c8102e"; ctx.fillRect(x + w * .44, y, w * .12, h); ctx.fillRect(x, y + h * .42, w, h * .16);
+  }
+  ctx.restore();
+  ctx.strokeStyle = "rgba(0,0,0,.4)"; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+}
+function drawJudoka(f) {
+  const sp = specOf(f), p = sp.pose, sd = SIDE[f.side], face = sp.face;
+  // local -> world -> screen, rotating about the hip
+  const W = pt => { const r = rotAbout(pt, p.hip, sp.rot); return [sx(sp.hx + face * (r[0] - p.hip[0])), sy(sp.hy + (r[1] - p.hip[1]))]; };
+  const turned = p.look < 0 || f.turn;
+  const legBend = turned ? -1 : 1;
+  const fk = ik(p.hip, p.ff, L1, L2, legBend), bk = ik(p.hip, p.bf, L1, L2, legBend);
+  const armBend = turned ? 1 : -1;
+  const fe = ik(p.sh, p.fh, A1, A2, armBend), be = ik(p.sh, p.bh, A1, A2, armBend);
+  const limb = (pts, w, col, out) => {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); const a = W(pts[0]); ctx.moveTo(a[0], a[1]); for (let i = 1; i < pts.length; i++) { const b = W(pts[i]); ctx.lineTo(b[0], b[1]); }
+    if (out) { ctx.strokeStyle = out; ctx.lineWidth = w * S + 3; ctx.stroke(); }
+    ctx.strokeStyle = col; ctx.lineWidth = w * S; ctx.stroke();
+  };
+  const dot = (pt, r, col) => { const q = W(pt); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(q[0], q[1], r * S, 0, 7); ctx.fill(); };
+  const lerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  const arm = (e, h, shade) => {
+    limb([p.sh, e, lerp(e, h, .78)], .115, shade ? sd.giShade : sd.gi, sd.edge);
+    limb([lerp(e, h, .74), h], .07, sd.skin);
+    dot(h, .045, sd.skin);
+  };
+  const leg = (k, ft, shade) => {
+    limb([p.hip, k, lerp(k, ft, .85)], .15, shade ? sd.giShade : sd.gi, sd.edge);
+    const a = W(lerp(k, ft, .82)), b = W(ft);
+    ctx.strokeStyle = sd.skin; ctx.lineWidth = .07 * S; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    const tip = W([ft[0] + .13, ft[1]]); ctx.lineWidth = .06 * S; ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(tip[0], tip[1]); ctx.stroke();
+  };
+  arm(be, p.bh, true);
+  leg(bk, p.bf, true);
+  // torso: jacket from hip to shoulders, with the lapel and the belt
+  const u = [p.sh[0] - p.hip[0], p.sh[1] - p.hip[1]], ul = Math.hypot(u[0], u[1]) || 1; u[0] /= ul; u[1] /= ul;
+  const n = [u[1], -u[0]];                                         // points to the chest side (local +x when upright)
+  const off = (pt, a, b) => [pt[0] + n[0] * a + u[0] * b, pt[1] + n[1] * a + u[1] * b];
+  const tq = [off(p.hip, -.14, -.1), off(p.hip, .15, -.1), off(p.sh, .14, .02), off(p.sh, -.15, .02)];
+  ctx.beginPath(); tq.forEach((q, i) => { const s = W(q); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.closePath();
+  ctx.lineJoin = "round"; ctx.strokeStyle = sd.edge; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = sd.gi; ctx.lineWidth = 6; ctx.stroke(); ctx.fillStyle = sd.gi; ctx.fill();
+  const chestSide = turned ? -1 : 1;
+  limb([off(p.sh, .03 * chestSide, -.02), off(p.hip, .13 * chestSide, .12)], .045, sd.giShade);
+  // belt with the knot tails at the front
+  const bl = f.belt || BELTS.black;
+  limb([off(p.hip, -.15, .06), off(p.hip, .16, .06)], .055, bl.c, "rgba(0,0,0,.35)");
+  if (bl.c2) limb([off(p.hip, -.05, .06), off(p.hip, .05, .06)], .055, bl.c2);
+  const kn = off(p.hip, .15 * chestSide, .06);
+  limb([kn, off(p.hip, .19 * chestSide, -.12)], .03, bl.c);
+  limb([kn, off(p.hip, .12 * chestSide, -.14)], .03, bl.c2 || bl.c);
+  leg(fk, p.ff, false);
+  // head
+  const hd = W(p.hd), r = .115 * S;
+  // hair on the back and top of the head, away from where the face looks
+  const lk = turned ? -1 : 1, bk0 = [-lk, .45], c = Math.cos(sp.rot), s = Math.sin(sp.rot);
+  const bkv = [c * bk0[0] - s * bk0[1], s * bk0[0] + c * bk0[1]];
+  const ang = Math.atan2(-bkv[1], face * bkv[0]);
+  ctx.fillStyle = sd.skin; ctx.beginPath(); ctx.arc(hd[0], hd[1], r, 0, 7); ctx.fill();
+  ctx.fillStyle = sd.hair; ctx.beginPath(); ctx.arc(hd[0], hd[1], r * 1.05, ang - 1.45, ang + 1.45); ctx.closePath(); ctx.fill();
+  arm(fe, p.fh, false);
+  if (G.t < f.teaUntil) {
+    const h = W(p.fh); ctx.fillStyle = "#fbfbf7"; ctx.strokeStyle = "#8e98a5"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(h[0] - 8, h[1] - 12); ctx.lineTo(h[0] + 8, h[1] - 12); ctx.lineTo(h[0] + 6, h[1]); ctx.lineTo(h[0] - 6, h[1]); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(h[0] + 9, h[1] - 7, 3.5, -1.4, 1.4); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.beginPath(); const st = G.t * 6;
+    ctx.moveTo(h[0], h[1] - 15); ctx.quadraticCurveTo(h[0] + 5 * Math.sin(st), h[1] - 22, h[0] - 2, h[1] - 30); ctx.stroke();
+  }
+  // power auras
+  if (G.t < f.jpnUntil || G.t < f.bearUntil) {
+    const c = W([p.hip[0], p.hip[1] + .3]); ctx.strokeStyle = `rgba(255,210,87,${.35 + .25 * Math.sin(G.t * 10)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(c[0], c[1], .55 * S, .95 * S, -sp.rot * face, 0, 7); ctx.stroke();
+  }
+}
+function drawBoard() {
+  const cx = VW / 2, y = 12, w = 560, rh = 40, h = rh * 2 + 8;
+  const x0 = cx - w / 2;
+  ctx.fillStyle = "rgba(8,11,16,.93)"; ctx.strokeStyle = "rgba(236,240,244,.18)"; ctx.lineWidth = 1.5;
+  roundRect(x0, y, w, h, 10); ctx.fill(); ctx.stroke();
+  ctx.textBaseline = "middle";
+  for (const f of G.P) {
+    const ry = y + 4 + f.side * rh, sd = SIDE[f.side];
+    ctx.fillStyle = f.side ? "#2559c6" : "#f4f2ec"; roundRect(x0 + 4, ry + 2, 380, rh - 4, 6); ctx.fill();
+    const ink = f.side ? "#fff" : "#141414";
+    if (f.nat && f.nat.flag) drawFlag(f.nat.flag, x0 + 12, ry + 11, 27, 18);
+    ctx.textAlign = "left"; ctx.fillStyle = ink; ctx.font = `700 21px ${BODY}`;
+    ctx.fillText(f.label.toUpperCase(), x0 + 48, ry + rh / 2 + 1, 150);
+    // shido cards
+    for (let i = 0; i < Math.min(3, f.shido); i++) { ctx.fillStyle = f.shido >= 3 ? "#e0262b" : "#ffd21f"; roundRect(x0 + 212 + i * 16, ry + 9, 12, 22, 2); ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke(); }
+    // ippon / waza-ari
+    ctx.textAlign = "center"; ctx.font = `400 26px ${DISPLAY}`; ctx.fillStyle = ink;
+    ctx.fillText(f.ippon || f.waza >= 2 ? "1" : "0", x0 + 296, ry + rh / 2 + 2);
+    ctx.fillText(String(f.ippon ? 0 : Math.min(1, f.waza)), x0 + 350, ry + rh / 2 + 2);
+    ctx.font = `700 11px ${BODY}`; ctx.fillStyle = f.side ? "rgba(255,255,255,.75)" : "rgba(0,0,0,.55)";
+    ctx.fillText("I", x0 + 276, ry + 12); ctx.fillText("W", x0 + 330, ry + 12);
+  }
+  // clock
+  ctx.textAlign = "center"; ctx.font = `400 34px ${DISPLAY}`;
+  ctx.fillStyle = G.gs ? "#ffd257" : "#eef1f4";
+  ctx.fillText(G.demo ? "–:––" : fmtClock(G.clock), x0 + 470, y + h / 2 - 6);
+  ctx.font = `700 14px ${BODY}`; ctx.fillStyle = G.gs ? "#ffd257" : "#a3adb9";
+  ctx.fillText(G.gs ? "GOLDEN SCORE" : G.demo ? "DEMO" : "CONTEST " + settings.mins + " MIN", x0 + 470, y + h / 2 + 24);
+  // osaekomi timer
+  const g = G.gr;
+  if (g && g.pinned) {
+    const ty = y + h + 8, tw = 300;
+    ctx.fillStyle = "rgba(8,11,16,.9)"; roundRect(cx - tw / 2, ty, tw, 34, 8); ctx.fill();
+    const col = g.tori.side ? "#3b7bff" : "#f4f2ec";
+    ctx.fillStyle = "rgba(255,255,255,.08)"; roundRect(cx - tw / 2 + 8, ty + 22, tw - 16, 6, 3); ctx.fill();
+    ctx.fillStyle = col; roundRect(cx - tw / 2 + 8, ty + 22, (tw - 16) * Math.min(1, g.hold / 20), 6, 3); ctx.fill();
+    ctx.fillStyle = "#ffd257"; ctx.fillRect(cx - tw / 2 + 8 + (tw - 16) / 2 - 1, ty + 19, 2, 12);
+    ctx.font = `700 15px ${BODY}`; ctx.textAlign = "left"; ctx.fillStyle = col;
+    ctx.fillText("OSAEKOMI " + SIDE[g.tori.side].name.toUpperCase(), cx - tw / 2 + 10, ty + 11);
+    ctx.textAlign = "right"; ctx.fillStyle = "#eef1f4"; ctx.fillText(g.hold.toFixed(1) + " s", cx + tw / 2 - 10, ty + 11);
+    // the struggle
+    const eh = Math.min(1, g.esc);
+    ctx.fillStyle = "rgba(255,255,255,.08)"; roundRect(cx - tw / 2 + 120, ty + 6, 90, 8, 3); ctx.fill();
+    ctx.fillStyle = "#e5484d"; roundRect(cx - tw / 2 + 120, ty + 6, 90 * eh, 8, 3); ctx.fill();
+  }
+  // powers under the board
+  for (const f of G.P) {
+    if (!f.nat || !f.nat.power) continue;
+    const ready = canPower(f), xx = f.side ? x0 + w + 10 : x0 - 10;
+    ctx.textAlign = f.side ? "left" : "right"; ctx.font = `700 15px ${BODY}`;
+    ctx.fillStyle = f.charges <= 0 ? "rgba(163,173,185,.45)" : ready ? `rgba(255,210,87,${.65 + .35 * Math.sin(G.t * 8)})` : "#c9a94a";
+    ctx.fillText(`★ ${f.nat.power.toUpperCase()} ×${f.charges}`, xx, y + 22);
+    ctx.fillStyle = "#a3adb9"; ctx.font = `600 14px ${BODY}`;
+    ctx.fillText((f.belt || BELTS.black).name, xx, y + 44);
+  }
+  // referee caption or superpower note
+  const nt = G.note && G.t < G.note.until ? G.note : null;
+  const c = G.caption && G.t < G.capUntil ? G.caption : null;
+  let cy = y + h + (g && g.pinned ? 52 : 12);
+  for (const it of [c && { big: c.ja, small: c.en }, nt && { big: nt.title, small: nt.en, gold: true }]) {
+    if (!it) continue;
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const maxW = VW - 48;
+    let fs = it.gold ? 20 : 28; ctx.font = `400 ${fs}px ${DISPLAY}`;
+    while (fs > 14 && ctx.measureText(it.big).width > maxW - 40) { fs -= 1; ctx.font = `400 ${fs}px ${DISPLAY}`; }
+    const w1 = Math.min(maxW, Math.max(ctx.measureText(it.big).width, measure(it.small, `600 19px ${BODY}`)) + 48);
+    const bh = it.small ? (it.gold ? 62 : 74) : 46;
+    ctx.fillStyle = it.gold ? "rgba(40,30,6,.85)" : "rgba(8,11,16,.84)"; roundRect(cx - w1 / 2, cy, w1, bh, 10); ctx.fill();
+    if (it.gold) { ctx.strokeStyle = "rgba(255,210,87,.6)"; ctx.lineWidth = 1.5; ctx.stroke(); }
+    ctx.fillStyle = it.gold ? "#ffd257" : "#eef1f4"; ctx.font = `400 ${fs}px ${DISPLAY}`; ctx.fillText(it.big, cx, cy + (it.gold ? 30 : 36));
+    if (it.small) { ctx.font = `600 19px ${BODY}`; ctx.fillStyle = "#c3cbd5"; ctx.fillText(it.small, cx, cy + (it.gold ? 52 : 63), maxW - 24); }
+    cy += bh + 8;
+  }
+  ctx.textBaseline = "middle";
+}
+function measure(t, font) { ctx.font = font; return ctx.measureText(t || "").width; }
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+let dpr = 1, kS = 1, offY = 0;
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = cv.clientWidth || innerWidth, h = cv.clientHeight || innerHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  kS = h / VH; VW = w / kS;
+  if (VW < 960) { VW = 960; kS = w / VW; }
+  offY = (h - VH * kS) / 2;
+  $("rotate").hidden = !(h > w && touchSeen);
+}
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#10141c"; ctx.fillRect(0, 0, cv.width, cv.height);
+  const shx = G.shake > 0 ? (Math.random() - .5) * 10 * G.shake : 0, shy = G.shake > 0 ? (Math.random() - .5) * 8 * G.shake : 0;
+  ctx.setTransform(dpr * kS, 0, 0, dpr * kS, dpr * shx, dpr * (offY + shy));
+  drawBackground();
+  drawReferee();
+  drawMat();
+  for (const f of G.P) { const sp = specOf(f); const lying = Math.abs(Math.sin(sp.rot)) > .5 || f.st === "turtle"; ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(sx(sp.hx), FLOOR + 4, (lying ? .95 : .55) * S, .07 * S, 0, 0, 7); ctx.fill(); }
+  // whoever is in the air or on top is drawn last
+  const order = [...G.P].sort((a, b) => z(a) - z(b));
+  for (const f of order) drawJudoka(f);
+  for (const q of G.dust) { ctx.fillStyle = `rgba(240,225,180,${Math.min(.5, q.life * .8)})`; ctx.beginPath(); ctx.arc(sx(q.x), sy(q.y), q.r, 0, 7); ctx.fill(); }
+  drawBoard();
+}
+function z(f) {
+  if (G.state === "throw" && G.act) return G.act.uke === f ? (G.act.tech.fall === "over" ? 2 : 0) : 1;
+  if (f.st === "pin" || f.st === "kneel") return 2;
+  if (f.act) return 2;
+  return f.side ? 1 : 0;
+}
+
+// ---------- loop ----------
+let last = 0, acc = 0, paused = false;
+const DT = 1 / 120;
+function frame(t) {
+  const el = Math.min(.1, (t - last) / 1000 || 0); last = t;
+  if (!paused && G.state !== "over") { acc += el; while (acc >= DT) { step(DT); acc -= DT; } }
+  render();
+  requestAnimationFrame(frame);
+}
+
+// ---------- end of contest ----------
+function gameOver() {
+  G.state = "over";
+  const [A, B] = G.P, w = G.winner;
+  const two = settings.mode === "2p";
+  $("overEyebrow").textContent = G.endWhy;
+  $("overTitle").textContent = two ? `${SIDE[w].name} wins` : w === 0 ? "You win" : "The bot wins";
+  const sc = f => f.ippon || f.waza >= 2 ? "Ippon" : f.waza ? "Waza-ari" : "–";
+  $("fs1").textContent = sc(A); $("fs2").textContent = sc(B);
+  const st = f => `${f.stats.att} attack${f.stats.att === 1 ? "" : "s"}, ${f.stats.counters} counter${f.stats.counters === 1 ? "" : "s"}, ${f.shido} shido`;
+  $("overStats").textContent = `White: ${st(A)}. Blue: ${st(B)}.`;
+  $("overOv").hidden = false; $("hudBtns").hidden = true; setTouch(false);
+  if (!G.demo) sfx.gong();
+}
+
+// ---------- menu & overlays ----------
+function syncMenu() {
+  for (const b of $("modeSeg").children) b.setAttribute("aria-pressed", String(b.dataset.mode === settings.mode));
+  for (const b of $("levelSeg").children) b.setAttribute("aria-pressed", String(b.dataset.level === settings.level));
+  for (const id of ["belt1", "belt2"]) {
+    const el = $(id);
+    if (!el.options.length) el.innerHTML = BELT_ORDER.map(k => `<option value="${k}">${BELTS[k].name}</option>`).join("");
+    el.value = settings[id];
+  }
+  for (const id of ["nat1", "nat2"]) {
+    const el = $(id);
+    if (!el.options.length) el.innerHTML = NATION_ORDER.map(k => `<option value="${k}">${NATIONS[k].power ? NATIONS[k].name + " · " + NATIONS[k].power : NATIONS[k].name}</option>`).join("");
+    el.value = settings[id];
+  }
+  $("natdesc").textContent = [settings.nat1, settings.nat2].filter((k, i, a) => NATIONS[k].power && a.indexOf(k) === i).map(k => NATIONS[k].desc).join(" ") || "Pure judo, no tricks.";
+  $("belt2").setAttribute("aria-label", settings.mode === "2p" ? "Blue judoka's belt" : "Bot's belt");
+  for (const b of $("lenSeg").children) b.setAttribute("aria-pressed", String(+b.dataset.mins === settings.mins));
+  $("levelField").hidden = settings.mode !== "bot";
+  const moves = "Throw while stepping in: O-soto-gari (reap them backwards). Throw while stepping back: Seoi-nage. Throw standing still: Uchi-mata. Sweep just as they step: De-ashi-barai. Throw while they turn in: counter. Pulling breaks their balance forward, pushing breaks it backward. On the ground press Grip or Throw to pin, and press anything fast to escape or hold on.";
+  if (touchSeen) {
+    $("keys").innerHTML = `<div><b>Touch</b>◀ ▶ step, <b style="display:inline">Grip</b> grabs the gi (or breaks their grip), <b style="display:inline">Throw</b> throws, <b style="display:inline">Sweep</b> sweeps the foot, <b style="display:inline">★</b> uses your superpower.</div><div><b>Moves</b>${moves}</div>`;
+  } else if (settings.mode === "2p") {
+    $("keys").innerHTML = `<div class="t1"><b>White (left)</b><kbd>A</kbd> <kbd>D</kbd> step · <kbd>W</kbd> grip · <kbd>S</kbd> throw · <kbd>E</kbd> sweep · <kbd>Q</kbd> superpower</div><div class="t2"><b>Blue (right)</b><kbd>←</kbd> <kbd>→</kbd> step · <kbd>↑</kbd> grip · <kbd>↓</kbd> throw · <kbd>/</kbd> or right <kbd>Shift</kbd> sweep · <kbd>.</kbd> or <kbd>Enter</kbd> superpower</div><div style="grid-column:1/-1"><b>Moves</b>${moves}</div>`;
+  } else {
+    $("keys").innerHTML = `<div class="t1"><b>You (white)</b><kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd> step · <kbd>W</kbd>/<kbd>↑</kbd> grip · <kbd>S</kbd>/<kbd>↓</kbd> throw · <kbd>E</kbd>/<kbd>Space</kbd> sweep · <kbd>Q</kbd>/<kbd>F</kbd> superpower · <kbd>P</kbd> pause</div><div><b>Moves</b>${moves}</div>`;
+  }
+}
+$("modeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; settings.mode = b.dataset.mode; saveSettings(); syncMenu(); });
+$("levelSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; settings.level = b.dataset.level; saveSettings(); syncMenu(); });
+for (const id of ["nat1", "nat2"]) $(id).addEventListener("change", e => { settings[id] = e.target.value; saveSettings(); syncMenu(); startGame(true); });
+for (const id of ["belt1", "belt2"]) $(id).addEventListener("change", e => { settings[id] = e.target.value; saveSettings(); for (const [s, k] of [[0, "belt1"], [1, "belt2"]]) if (G.P[s]) G.P[s].belt = BELTS[settings[k]]; });
+$("lenSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; settings.mins = +b.dataset.mins; saveSettings(); syncMenu(); });
+$("playBtn").addEventListener("click", () => { initAudio(); startGame(false); });
+$("againBtn").addEventListener("click", () => { initAudio(); startGame(false); });
+$("menuBtn").addEventListener("click", () => { syncMenu(); startGame(true); });
+function togglePause() { paused ? resume() : pauseGame(); }
+function pauseGame() { paused = true; $("pauseOv").hidden = false; try { speechSynthesis.cancel(); } catch (e) {} }
+function resume() { paused = false; $("pauseOv").hidden = true; KEYS_DOWN.clear(); }
+$("pauseBtn").addEventListener("click", pauseGame);
+$("resumeBtn").addEventListener("click", resume);
+$("quitBtn").addEventListener("click", () => { resume(); syncMenu(); startGame(true); });
+function syncMute() { $("muteBtn").textContent = muted ? "✕" : "♪"; $("muteBtn").setAttribute("aria-pressed", String(!muted)); }
+$("muteBtn").addEventListener("click", () => { muted = !muted; try { localStorage.setItem("tatamiduel.muted", muted ? "1" : "0"); } catch (e) {} initAudio(); syncMute(); if (muted) try { speechSynthesis.cancel(); } catch (e) {} });
+document.addEventListener("visibilitychange", () => { if (document.hidden && !G.demo && G.state !== "over" && !paused) pauseGame(); });
+addEventListener("resize", resize);
+
+// touch controls
+let touchSeen = matchMedia("(pointer: coarse)").matches;
+addEventListener("touchstart", () => { if (!touchSeen) { touchSeen = true; syncMenu(); resize(); if (!G.demo && G.state !== "over") setTouch(true); } }, { passive: true });
+function setTouch(on) {
+  const el = $("touch");
+  el.innerHTML = "";
+  if (!on || !touchSeen) { el.hidden = true; return; }
+  const btn = (p, act, label, cls) => `<button class="tbtn ${cls || ""}" data-p="${p}" data-act="${act}" aria-label="${act}">${label}</button>`;
+  const pw = p => G.P[p] && G.P[p].nat && G.P[p].nat.power ? btn(p, "power", "★ " + G.P[p].nat.short, "pw") : "<span></span>";
+  if (settings.mode === "2p") {
+    el.innerHTML =
+      `<div class="pad quad p1">${btn(0, "grip", "Grip")}${btn(0, "throw", "Throw", "atk")}${btn(0, "sweep", "Sweep")}${btn(0, "left", "◀")}${btn(0, "right", "▶")}${pw(0)}</div>` +
+      `<div class="pad quad p2">${btn(1, "sweep", "Sweep")}${btn(1, "throw", "Throw", "atk")}${btn(1, "grip", "Grip")}${pw(1)}${btn(1, "left", "◀")}${btn(1, "right", "▶")}</div>`;
+  } else {
+    el.innerHTML =
+      `<div class="pad">${btn(0, "left", "◀", "big")}${btn(0, "right", "▶", "big")}${pw(0)}</div>` +
+      `<div class="pad">${btn(0, "sweep", "Sweep")}${btn(0, "grip", "Grip", "big")}${btn(0, "throw", "Throw", "big atk")}</div>`;
+  }
+  el.hidden = false;
+}
+const touchEl = $("touch");
+function tdown(e) {
+  const b = e.target.closest(".tbtn"); if (!b) return; e.preventDefault(); initAudio();
+  try { b.setPointerCapture(e.pointerId); } catch (_) {}
+  TOUCH[+b.dataset.p][b.dataset.act] = true; TAPS[+b.dataset.p][b.dataset.act] = true; b.classList.add("on");
+}
+function tup(e) {
+  const b = e.target.closest(".tbtn"); if (!b) return; e.preventDefault();
+  TOUCH[+b.dataset.p][b.dataset.act] = false; b.classList.remove("on");
+}
+touchEl.addEventListener("pointerdown", tdown);
+touchEl.addEventListener("pointerup", tup);
+touchEl.addEventListener("pointercancel", tup);
+touchEl.addEventListener("lostpointercapture", tup);
+touchEl.addEventListener("contextmenu", e => e.preventDefault());
+
+window.__judo = { G, settings, startGame: d => startGame(d), step: dt => step(dt), usePower: s => usePower(G.P[s]), award, halt };
+
+// boot
+syncMenu(); syncMute(); resize();
+startGame(true);
+requestAnimationFrame(t => { last = t; frame(t); });
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
