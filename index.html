@@ -130,6 +130,14 @@ kbd{font-family:var(--body);font-weight:700;color:var(--chalk);background:rgba(2
       </div>
       <div class="opts">
         <div class="field">
+          <div class="label">Game mode</div>
+          <div class="seg" id="skillSeg">
+            <button id="sk-starter" data-skill="starter">Starter</button>
+            <button id="sk-expert" data-skill="expert">Expert</button>
+          </div>
+          <p class="wdesc" id="skilldesc"></p>
+        </div>
+        <div class="field">
           <div class="label">Opponent</div>
           <div class="seg" id="modeSeg">
             <button id="mode-bot" data-mode="bot">Bot</button>
@@ -144,14 +152,14 @@ kbd{font-family:var(--body);font-weight:700;color:var(--chalk);background:rgba(2
             <button id="lv-hard" data-level="hard">Hard</button>
           </div>
         </div>
-        <div class="field">
+        <div class="field" id="beltField">
           <div class="label">Belts</div>
           <div class="clubs">
             <select id="belt1" aria-label="White judoka's belt"></select>
             <select id="belt2" aria-label="Blue judoka's belt"></select>
           </div>
         </div>
-        <div class="field">
+        <div class="field" id="natField">
           <div class="label">Superpowers</div>
           <div class="clubs">
             <select id="nat1" aria-label="White judoka's superpower"></select>
@@ -159,7 +167,7 @@ kbd{font-family:var(--body);font-weight:700;color:var(--chalk);background:rgba(2
           </div>
           <p class="wdesc" id="natdesc"></p>
         </div>
-        <div class="field">
+        <div class="field" id="lenField">
           <div class="label">Contest</div>
           <div class="seg" id="lenSeg">
             <button id="len-2" data-mins="2">2 min</button>
@@ -291,7 +299,7 @@ function mixPose(a, b, k) {
 const clonePose = a => mixPose(a, a, 0);
 
 // ---------- settings ----------
-const settings = { mode: "bot", level: "medium", mins: 4, belt1: "black", belt2: "black", nat1: "bel", nat2: "jpn" };
+const settings = { skill: "starter", mode: "bot", level: "medium", mins: 4, belt1: "black", belt2: "black", nat1: "bel", nat2: "jpn" };
 try { Object.assign(settings, JSON.parse(localStorage.getItem("tatamiduel.settings") || "{}")); } catch (e) {}
 if (!MINS[settings.mins]) settings.mins = 4;
 if (!LEVELS[settings.level]) settings.level = "medium";
@@ -299,6 +307,10 @@ if (!BELTS[settings.belt1]) settings.belt1 = "black";
 if (!BELTS[settings.belt2]) settings.belt2 = "black";
 if (!NATIONS[settings.nat1]) settings.nat1 = "bel";
 if (!NATIONS[settings.nat2]) settings.nat2 = "jpn";
+if (settings.skill !== "expert") settings.skill = "starter";
+// Starter mode: grip and throw only (the throw picks itself from the opponent's balance), 2-minute contests, no sweeps, counters or superpowers.
+const EXPERT = () => settings.skill === "expert";
+const CMINS = () => EXPERT() ? settings.mins : 2;
 function saveSettings() { try { localStorage.setItem("tatamiduel.settings", JSON.stringify(settings)); } catch (e) {} }
 
 // ---------- helpers ----------
@@ -383,21 +395,25 @@ function makeJudoka(side, human, levelKey) {
     input: { move: 0, grip: false, throw: false, sweep: false, power: false, mash: false, tech: null }, prev: {},
     teaUntil: -9, jpnUntil: -9, bearUntil: -9, bjj: false, charges: 0,
     bot: null, label: "", stats: { att: 0, counters: 0, pins: 0 } };
-  if (!human) f.bot = new Bot(f, LEVELS[levelKey]);
+  if (!human) f.bot = new Bot(f, botLevel(levelKey));
   return f;
 }
 
+// Starter bots stick to the starter moves: no sweeps and no counters
+function botLevel(key) { const lv = LEVELS[key]; return EXPERT() ? lv : Object.assign({}, lv, { counter: 0, sweep: 0 }); }
 function startGame(demo) {
   G.demo = !!demo;
   const two = settings.mode === "2p";
   G.P = [makeJudoka(0, !demo, "medium"), makeJudoka(1, !demo && two, demo ? "medium" : settings.level)];
-  if (demo) G.P[0].bot.lv = LEVELS.medium;
+  if (demo) G.P[0].bot.lv = botLevel("medium");
   G.P[0].belt = BELTS[settings.belt1]; G.P[1].belt = BELTS[settings.belt2];
-  G.P[0].nat = NATIONS[settings.nat1]; G.P[1].nat = NATIONS[settings.nat2];
-  for (const f of G.P) { f.natKey = f.side ? settings.nat2 : settings.nat1; f.charges = f.nat.power ? (settings.mins >= 4 ? 2 : 1) : 0; }
+  for (const f of G.P) {
+    f.natKey = EXPERT() ? (f.side ? settings.nat2 : settings.nat1) : "none"; f.nat = NATIONS[f.natKey];
+    f.charges = f.nat.power ? (CMINS() >= 4 ? 2 : 1) : 0;
+  }
   G.P[0].label = demo ? "Bot" : two ? "Player 1" : "You";
   G.P[1].label = demo ? "Bot" : two ? "Player 2" : "Bot · " + LEVELS[settings.level].name;
-  G.t = 0; G.parts = []; G.dust = []; G.gs = false; G.total = MINS[settings.mins]; G.clock = G.total;
+  G.t = 0; G.parts = []; G.dust = []; G.gs = false; G.total = MINS[CMINS()]; G.clock = G.total;
   G.note = null; G.pending = null; G.protest = null; G.winner = -1; TIMERS.length = 0; G.act = null; G.gr = null; G.sig = null;
   G.cam = 0; G.refX = 0; G.refArms = { L: [.12, .06, 0], R: [.12, .06, 0] };
   resetPositions();
@@ -438,13 +454,15 @@ function tryGrip(f) {
 }
 function techFromInput(f) {
   if (f.input.tech) return f.input.tech;
+  if (!EXPERT()) return other(f).bal < -.05 ? "osoto" : "seoi";
   return f.input.move > 0 ? "osoto" : f.input.move < 0 ? "seoi" : "uchi";
 }
 function tryThrow(f, key) {
   const o = other(f);
   if (G.state !== "fight" || f.stun > 0 || G.t < f.teaUntil || f.st !== "stand") return;
   // a throw pressed while the opponent is turning in is a counter attempt
-  if (o.act && o.act.phase === "entry" && !f.act) { tryCounter(f, o); return; }
+  if (o.act && o.act.phase === "entry" && !f.act) { if (EXPERT()) tryCounter(f, o); return; }
+  if (key === "deashi" && !EXPERT()) return;
   if (f.act || gapOf() > GRIP_RANGE + .15) return;
   const T = TECH[key];
   f.act = { key, tech: T, phase: "entry", t: 0, x0: f.x, uke: o };
@@ -1222,6 +1240,21 @@ function drawJudoka(f) {
     ctx.beginPath(); ctx.ellipse(c[0], c[1], .55 * S, .95 * S, -sp.rot * face, 0, 7); ctx.stroke();
   }
 }
+// Starter help: a marker under the opponent that says when to grip and when their balance is broken enough to throw
+function drawHint(f) {
+  const o = other(f), gap = Math.abs(o.x - f.x);
+  if (f.st !== "stand" || o.st !== "stand" || f.act) return;
+  let txt = "", hot = false;
+  if (f.grip <= 0) { if (gap <= GRIP_RANGE) txt = "IN REACH: GRIP!"; }
+  else if (Math.abs(o.bal) > .3) { txt = o.bal > 0 ? "OFF BALANCE: THROW!" : "LEANING BACK: THROW!"; hot = true; }
+  else txt = "PULL OR PUSH";
+  const x = sx(o.x), y = FLOOR + 16;
+  ctx.save();
+  ctx.fillStyle = hot ? `rgba(255,210,87,${.55 + .3 * Math.sin(G.t * 10)})` : txt ? "rgba(255,210,87,.35)" : "rgba(236,240,244,.16)";
+  ctx.beginPath(); ctx.ellipse(x, y, .5 * S, .06 * S, 0, 0, 7); ctx.fill();
+  if (txt) { ctx.font = `700 16px ${BODY}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = hot ? "#ffd257" : "#d8dee6"; ctx.fillText(txt, x, y + 26); }
+  ctx.restore();
+}
 function drawBoard() {
   const cx = VW / 2, y = 12, w = 560, rh = 40, h = rh * 2 + 8;
   const x0 = cx - w / 2;
@@ -1249,7 +1282,7 @@ function drawBoard() {
   ctx.fillStyle = G.gs ? "#ffd257" : "#eef1f4";
   ctx.fillText(G.demo ? "–:––" : fmtClock(G.clock), x0 + 470, y + h / 2 - 6);
   ctx.font = `700 14px ${BODY}`; ctx.fillStyle = G.gs ? "#ffd257" : "#a3adb9";
-  ctx.fillText(G.gs ? "GOLDEN SCORE" : G.demo ? "DEMO" : "CONTEST " + settings.mins + " MIN", x0 + 470, y + h / 2 + 24);
+  ctx.fillText(G.gs ? "GOLDEN SCORE" : G.demo ? "DEMO" : "CONTEST " + CMINS() + " MIN", x0 + 470, y + h / 2 + 24);
   // osaekomi timer
   const g = G.gr;
   if (g && g.pinned) {
@@ -1322,6 +1355,7 @@ function render() {
   // whoever is in the air or on top is drawn last
   const order = [...G.P].sort((a, b) => z(a) - z(b));
   for (const f of order) drawJudoka(f);
+  if (!EXPERT() && !G.demo && G.state === "fight") for (const f of G.P) if (f.human) drawHint(f);
   for (const q of G.dust) { ctx.fillStyle = `rgba(240,225,180,${Math.min(.5, q.life * .8)})`; ctx.beginPath(); ctx.arc(sx(q.x), sy(q.y), q.r, 0, 7); ctx.fill(); }
   drawBoard();
 }
@@ -1375,6 +1409,16 @@ function syncMenu() {
   $("belt2").setAttribute("aria-label", settings.mode === "2p" ? "Blue judoka's belt" : "Bot's belt");
   for (const b of $("lenSeg").children) b.setAttribute("aria-pressed", String(+b.dataset.mins === settings.mins));
   $("levelField").hidden = settings.mode !== "bot";
+  for (const b of $("skillSeg").children) b.setAttribute("aria-pressed", String(b.dataset.skill === settings.skill));
+  for (const id of ["beltField", "natField", "lenField"]) $(id).hidden = !EXPERT();
+  $("skilldesc").textContent = EXPERT() ? "Every technique, sweeps and counters, belts, superpowers and contests up to 4 minutes." : "New to judo? Just grip and throw. The game picks the right throw for you, contests last 2 minutes, and a hint shows when to grip and when to throw.";
+  if (!EXPERT()) {
+    const basics = "Walk in and grip. Then step back to pull or step in to push until the gold hint says throw. On the ground, press Grip or Throw to pin, and press anything fast to get out of a pin.";
+    if (touchSeen) $("keys").innerHTML = `<div><b>Touch</b>◀ ▶ step, <b style="display:inline">Grip</b> grabs the gi, <b style="display:inline">Throw</b> throws.</div><div><b>How to score</b>${basics}</div>`;
+    else if (settings.mode === "2p") $("keys").innerHTML = `<div class="t1"><b>White (left)</b><kbd>A</kbd> <kbd>D</kbd> step · <kbd>W</kbd> grip · <kbd>S</kbd> throw</div><div class="t2"><b>Blue (right)</b><kbd>←</kbd> <kbd>→</kbd> step · <kbd>↑</kbd> grip · <kbd>↓</kbd> throw</div><div style="grid-column:1/-1"><b>How to score</b>${basics}</div>`;
+    else $("keys").innerHTML = `<div class="t1"><b>You (white)</b><kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd> step · <kbd>W</kbd>/<kbd>↑</kbd> grip · <kbd>S</kbd>/<kbd>↓</kbd> throw · <kbd>P</kbd> pause</div><div><b>How to score</b>${basics}</div>`;
+    return;
+  }
   const moves = "Throw while stepping in: O-soto-gari (reap them backwards). Throw while stepping back: Seoi-nage. Throw standing still: Uchi-mata. Sweep just as they step: De-ashi-barai. Throw while they turn in: counter. Pulling breaks their balance forward, pushing breaks it backward. On the ground press Grip or Throw to pin, and press anything fast to escape or hold on.";
   if (touchSeen) {
     $("keys").innerHTML = `<div><b>Touch</b>◀ ▶ step, <b style="display:inline">Grip</b> grabs the gi (or breaks their grip), <b style="display:inline">Throw</b> throws, <b style="display:inline">Sweep</b> sweeps the foot, <b style="display:inline">★</b> uses your superpower.</div><div><b>Moves</b>${moves}</div>`;
@@ -1384,6 +1428,7 @@ function syncMenu() {
     $("keys").innerHTML = `<div class="t1"><b>You (white)</b><kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd> step · <kbd>W</kbd>/<kbd>↑</kbd> grip · <kbd>S</kbd>/<kbd>↓</kbd> throw · <kbd>E</kbd>/<kbd>Space</kbd> sweep · <kbd>Q</kbd>/<kbd>F</kbd> superpower · <kbd>P</kbd> pause</div><div><b>Moves</b>${moves}</div>`;
   }
 }
+$("skillSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; settings.skill = b.dataset.skill; saveSettings(); syncMenu(); startGame(true); });
 $("modeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; settings.mode = b.dataset.mode; saveSettings(); syncMenu(); });
 $("levelSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; settings.level = b.dataset.level; saveSettings(); syncMenu(); });
 for (const id of ["nat1", "nat2"]) $(id).addEventListener("change", e => { settings[id] = e.target.value; saveSettings(); syncMenu(); startGame(true); });
@@ -1412,7 +1457,13 @@ function setTouch(on) {
   if (!on || !touchSeen) { el.hidden = true; return; }
   const btn = (p, act, label, cls) => `<button class="tbtn ${cls || ""}" data-p="${p}" data-act="${act}" aria-label="${act}">${label}</button>`;
   const pw = p => G.P[p] && G.P[p].nat && G.P[p].nat.power ? btn(p, "power", "★ " + G.P[p].nat.short, "pw") : "<span></span>";
-  if (settings.mode === "2p") {
+  if (!EXPERT()) {
+    el.innerHTML = settings.mode === "2p" ?
+      `<div class="pad quad p1" style="grid-template-columns:auto auto">${btn(0, "grip", "Grip")}${btn(0, "throw", "Throw", "atk")}${btn(0, "left", "◀")}${btn(0, "right", "▶")}</div>` +
+      `<div class="pad quad p2" style="grid-template-columns:auto auto">${btn(1, "throw", "Throw", "atk")}${btn(1, "grip", "Grip")}${btn(1, "left", "◀")}${btn(1, "right", "▶")}</div>` :
+      `<div class="pad">${btn(0, "left", "◀", "big")}${btn(0, "right", "▶", "big")}</div>` +
+      `<div class="pad">${btn(0, "grip", "Grip", "big")}${btn(0, "throw", "Throw", "big atk")}</div>`;
+  } else if (settings.mode === "2p") {
     el.innerHTML =
       `<div class="pad quad p1">${btn(0, "grip", "Grip")}${btn(0, "throw", "Throw", "atk")}${btn(0, "sweep", "Sweep")}${btn(0, "left", "◀")}${btn(0, "right", "▶")}${pw(0)}</div>` +
       `<div class="pad quad p2">${btn(1, "sweep", "Sweep")}${btn(1, "throw", "Throw", "atk")}${btn(1, "grip", "Grip")}${pw(1)}${btn(1, "left", "◀")}${btn(1, "right", "▶")}</div>`;

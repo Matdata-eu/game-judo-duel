@@ -5,6 +5,8 @@ Judo as an installable web app (PWA). Take a grip, pull and push to break your o
 **Play:** https://matdata-eu.github.io/game-judo-duel/
 
 ## Modes
+- **Starter** (default): for people who have never done judo. Only step, grip and throw: the game picks the throw that fits your opponent's balance, contests last 2 minutes, there are no sweeps, counters or superpowers, and a gold hint under your opponent says when to grip and when to throw. The menu only asks for opponent and bot level.
+- **Expert**: everything below, including the choice of throw, the foot sweep, counters, belts, superpowers and 3- or 4-minute contests.
 - **Bot**: you (white, left) against a bot (blue, right) on Easy, Medium or Hard. Harder bots react faster, block and counter more often, fight harder for the grip and wait for real kuzushi before they throw.
 - **2 Players**: two people on one device. Keyboard: White `A D` step, `W` grip, `S` throw, `E` sweep, `Q` superpower. Blue `← →` step, `↑` grip, `↓` throw, `/` or right `Shift` sweep, `.` or `Enter` superpower. Against the bot, the arrows, `Space` (sweep) and `F` (superpower) work for you too. On a touchscreen each player gets buttons on their side.
 - **Belts**: pick a belt for each judoka, from white to black, or the red and white belt of 6th to 8th dan. It's for looks only.
